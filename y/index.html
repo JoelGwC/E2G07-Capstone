@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Firebase Auth Example</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f3f4f6;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+
+      .container {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        width: 350px;
+        text-align: center;
+      }
+
+      input {
+        width: 90%;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+
+      button {
+        width: 95%;
+        padding: 0.7rem;
+        margin-top: 1rem;
+        background-color: #007bff;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+
+      #message {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Room Booking</h2>
+
+      <input type="email" id="email" placeholder="Email" required />
+      <input type="password" id="password" placeholder="Password" required />
+
+      <button id="signup">Sign Up</button>
+      <button id="login">Log In</button>
+      <button id="google-login">Google Log In</button>
+
+      <p id="message"></p>
+      <p id="google-message"></p>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+      // Import Firebase modules
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+      import {
+        getAuth,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        signInWithPopup,
+        GoogleAuthProvider
+      } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+      // Your Firebase config from Firebase Console
+      const firebaseConfig = {
+        apiKey: "AIzaSyB0XjpqmXA7wab9EBNvzo-8abHxjJnDqdk",
+        authDomain: "localtest-0327.firebaseapp.com",
+        databaseURL:
+          "https://localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "localtest-0327",
+        storageBucket: "localtest-0327.firebasestorage.app",
+        messagingSenderId: "619374002435",
+        appId: "1:619374002435:web:c66e8326a677a71bf22936",
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+
+      // Get HTML elements
+      const emailInput = document.getElementById("email");
+      const passwordInput = document.getElementById("password");
+      const message = document.getElementById("message");
+      const googleMessage = document.getElementById("google-message");
+      const googleLoginBtn = document.getElementById("google-login");
+
+      // ----- SIGN UP -----
+      document.getElementById("signup").addEventListener("click", () => {
+        const email = emailInput.value;
+        const password = passwordInput.value;
+
+        createUserWithEmailAndPassword(auth, email, password)
+          .then((userCredential) => {
+            const user = userCredential.user;
+            message.style.color = "green";
+            message.textContent = `Sign-up successful! Welcome, ${user.email}`;
+            console.log("User signed up:", user);
+          })
+          .catch((error) => {
+            message.style.color = "red";
+            message.textContent = error.message;
+            console.error(error);
+          });
+      });
+
+      // ----- LOG IN -----
+      document.getElementById("login").addEventListener("click", () => {
+        const email = emailInput.value;
+        const password = passwordInput.value;
+
+        signInWithEmailAndPassword(auth, email, password)
+          .then((userCredential) => {
+            const user = userCredential.user;
+            message.style.color = "green";
+            message.textContent = `Login successful! Welcome back, ${user.email}`;
+            console.log("User logged in:", user);
+          })
+          .catch((error) => {
+            message.style.color = "red";
+            message.textContent = error.message;
+            console.error(error);
+          });
+      });
+
+      // Sign in with Google
+      googleLoginBtn.addEventListener("click", () => {
+        signInWithPopup(auth, provider)
+          .then((result) => {
+            const user = result.user;
+            googleMessage.style.color = "green";
+            googleMessage.textContent = `Welcome, ${user.displayName} (${user.email})`;
+            console.log("User info:", user);
+          })
+          .catch((error) => {
+            googleMessage.style.color = "red";
+            googleMessage.textContent = error.message;
+            console.error(error);
+          });
+      });
+    </script>
+  </body>
+</html>
