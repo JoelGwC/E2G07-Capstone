@@ -5,8 +5,8 @@
 #include <WiFiUdp.h>
 
 // ================= TODO: UPDATE YOUR CREDENTIALS =================
-#define WIFI_SSID "WeiCun"
-#define WIFI_PASSWORD "GwC270303"
+#define WIFI_SSID "KoenigseggOne1"
+#define WIFI_PASSWORD "gwt110199"
 #define FIREBASE_HOST "localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define FIREBASE_AUTH "GPK6p0wRo1MRLG0woe3t4sisdGss9jMvaLl2Lq8s"
 
@@ -53,8 +53,20 @@ void setup() {
 
   connectToWiFi();
   configTime(0, 0, "pool.ntp.org");
+
+  // === FIX 1: KEYPAD SENSITIVITY (DEBOUNCE) ===
+  // Increases stability. If keys still double-press, increase to 100.
+  keypad.setDebounceTime(50);
   timeClient.begin();
   
+  // === FIX 2: WAIT FOR VALID TIME ===
+  Serial.print("Waiting for time sync...");
+  while (timeClient.getEpochTime() < 1600000000) { // Wait until year > 2020
+      timeClient.update();
+      delay(500);
+      Serial.print(".");
+  }
+  Serial.println("\nTime Synced!");
 // === NEW LINES TO ADD HERE ===
   // 1. Set the size of the SSL buffer to handle larger certificates
   firebaseData.setBSSLBufferSize(1024 * 4 /* Rx buffer size */, 1024 /* Tx buffer size */);
@@ -93,6 +105,7 @@ void handleKeypad() {
   char key = keypad.getKey();
   if (key) {
     Serial.print("Key Pressed: "); Serial.println(key);
+
     if (key == '#') {
       // '#' signifies end of entry, check code
       if (inputCode.length() > 0) {
@@ -102,6 +115,13 @@ void handleKeypad() {
     } else if (key == '*') {
        inputCode = ""; // Clear buffer if mistake made
        Serial.println("Buffer Cleared");
+    } else if (key == 'A') {
+      if (inputCode.length() > 0) {
+        inputCode.remove(inputCode.length() - 1); // Delete last char
+        Serial.println("Backspace: " + inputCode);
+      } else {
+        Serial.println("Buffer empty");
+      }
     } else {
       inputCode += key; // Append number
     }
@@ -123,6 +143,7 @@ void checkAccessCode(String enteredCode) {
       long startTime = 0;
       long endTime = 0;
       bool useLights = false;
+      bool hasCheckedIn = false; // New variable
 
       FirebaseJsonData jsonData;
       json.get(jsonData, "start_time");
@@ -131,18 +152,50 @@ void checkAccessCode(String enteredCode) {
       if (jsonData.success) endTime = jsonData.intValue;
       json.get(jsonData, "use_lights");
       if (jsonData.success) useLights = jsonData.boolValue;
+      json.get(jsonData, "has_checked_in");
+      if (jsonData.success) hasCheckedIn = jsonData.boolValue;
 
       Serial.printf("Current Time: %lu, Start: %ld, End: %ld\n", currentEpoch, startTime, endTime);
 
+      // === 15 MINUTE RULE LOGIC ===
+      long lateLimit = startTime + (15 * 60); // 15 mins in seconds
+
+
       if (currentEpoch >= startTime && currentEpoch < endTime) {
-        Serial.println("ACCESS GRANTED");
-        grantAccess(useLights);
-      } else {
+        if (hasCheckedIn) {
+           // Case A: They checked in before. Let them re-enter anytime during booking.
+           Serial.println("ACCESS GRANTED (Re-entry)");
+           grantAccess(useLights);
+        } 
+        else {
+           // Case B: First time entering. Are they late?
+           if (currentEpoch > lateLimit) {
+             Serial.println("ACCESS DENIED: Check-in time (15m) exceeded.");
+             blinkFeedback(3); // Error blink
+             
+             // Optional: Delete the booking from DB since it's invalid now
+             // Firebase.deleteNode(firebaseData, path);
+           } 
+           else {
+             // Case C: First time entering, and they are ON TIME.
+             Serial.println("ACCESS GRANTED (First Check-in)");
+             
+             // IMPORTANT: Mark them as checked in!
+             // We update ONLY the specific boolean field to save data
+             Firebase.setBool(firebaseData, path + "/has_checked_in", true);
+             
+             grantAccess(useLights);
+           }
+          }
+        }
+       
+      else {
         Serial.println("ACCESS DENIED: Code expired or not yet active.");
         blinkFeedback(3); // Blink error feedback
       }
       
-    } else {
+    } 
+    else {
        Serial.println("ACCESS DENIED: Code not found or invalid format.");
        blinkFeedback(3);
     }
