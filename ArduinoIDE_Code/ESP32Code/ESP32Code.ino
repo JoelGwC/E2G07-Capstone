@@ -13,8 +13,8 @@
 #define ROOM_ID "room_001" // The ID of this specific room controller
 
 // ================= HARDWARE PIN DEFINITIONS =================
-const int PIN_RELAY_LIGHTS = 26;
-const int PIN_SOLENOID_LOCK = 27;
+const int PIN_RELAY_LIGHTS = 15;
+const int PIN_SOLENOID_LOCK = 2;
 
 // Keypad Setup (Adjust pins based on your wiring)
 const byte ROWS = 4;
@@ -42,6 +42,7 @@ String inputCode = "";
 unsigned long unlockStartTime = 0;
 bool isUnlocked = false;
 const int UNLOCK_DURATION_MS = 5000; // Keep door open for 5 seconds
+unsigned long activeSessionEndTime = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -87,6 +88,7 @@ void loop() {
   timeClient.update();
   handleKeypad();
   handleLockTimer();
+  handleLightTimer();
 }
 
 void connectToWiFi() {
@@ -129,87 +131,98 @@ void handleKeypad() {
 }
 
 void checkAccessCode(String enteredCode) {
-  Serial.println("Checking code: " + enteredCode + " with Firebase...");
-
-  // Construct path: /rooms/room_001/active_codes/123456
+  Serial.println("Checking code: " + enteredCode + "...");
   String path = "/rooms/" + String(ROOM_ID) + "/active_codes/" + enteredCode;
 
   if (Firebase.get(firebaseData, path)) {
     if (firebaseData.dataType() == "json") {
-      Serial.println("Code found! Checking time validity...");
       FirebaseJson &json = firebaseData.jsonObject();
-
+      
       unsigned long currentEpoch = timeClient.getEpochTime();
       long startTime = 0;
       long endTime = 0;
+      long createdAt = 0; // <--- 1. NEW VARIABLE
       bool useLights = false;
-      bool hasCheckedIn = false; // New variable
+      bool hasCheckedIn = false;
 
+      // Parse JSON
       FirebaseJsonData jsonData;
       json.get(jsonData, "start_time");
       if (jsonData.success) startTime = jsonData.intValue;
+      
       json.get(jsonData, "end_time");
       if (jsonData.success) endTime = jsonData.intValue;
+      
+      // <--- 2. FETCH CREATED_AT
+      json.get(jsonData, "created_at");
+      if (jsonData.success) createdAt = jsonData.intValue;
+
       json.get(jsonData, "use_lights");
       if (jsonData.success) useLights = jsonData.boolValue;
+      
       json.get(jsonData, "has_checked_in");
       if (jsonData.success) hasCheckedIn = jsonData.boolValue;
 
-      Serial.printf("Current Time: %lu, Start: %ld, End: %ld\n", currentEpoch, startTime, endTime);
+      Serial.printf("Current: %lu, Start: %ld, Created: %ld\n", currentEpoch, startTime, createdAt);
 
-      // === 15 MINUTE RULE LOGIC ===
-      long lateLimit = startTime + (15 * 60); // 15 mins in seconds
+      // <--- 3. SMART DEADLINE LOGIC
+      // If booking was made AFTER start time (late booking), use creation time.
+      // Otherwise, use the scheduled start time.
+      long baseTime = (createdAt > startTime) ? createdAt : startTime;
+      
+      long lateLimit = baseTime + (3 * 60); // 3 Minute Grace Period from Base Time
 
-
-      if (currentEpoch >= startTime && currentEpoch < endTime) {
+      // === ACCESS LOGIC ===
+      if (currentEpoch < endTime) { // Is the slot still active?
+        
         if (hasCheckedIn) {
-           // Case A: They checked in before. Let them re-enter anytime during booking.
+           // Case A: Already checked in. Allow re-entry.
            Serial.println("ACCESS GRANTED (Re-entry)");
-           grantAccess(useLights);
+           grantAccess(useLights, endTime);
         } 
         else {
-           // Case B: First time entering. Are they late?
+           // Case B: First time entering.
            if (currentEpoch > lateLimit) {
-             Serial.println("ACCESS DENIED: Check-in time (15m) exceeded.");
-             blinkFeedback(3); // Error blink
-             
-             // Optional: Delete the booking from DB since it's invalid now
-             // Firebase.deleteNode(firebaseData, path);
+             // It is past the 15-minute window
+             Serial.println("ACCESS DENIED: Check-in deadline expired.");
+             blinkFeedback(3); 
            } 
            else {
-             // Case C: First time entering, and they are ON TIME.
+             // Case C: On Time (or Late Booking within 15m of booking time)
              Serial.println("ACCESS GRANTED (First Check-in)");
              
-             // IMPORTANT: Mark them as checked in!
-             // We update ONLY the specific boolean field to save data
+             // Update DB so the timer stops on the website
              Firebase.setBool(firebaseData, path + "/has_checked_in", true);
              
-             grantAccess(useLights);
+             grantAccess(useLights, endTime);
            }
-          }
         }
-       
-      else {
-        Serial.println("ACCESS DENIED: Code expired or not yet active.");
-        blinkFeedback(3); // Blink error feedback
+
+      } else {
+        Serial.println("ACCESS DENIED: Booking has ended.");
+        blinkFeedback(3);
       }
       
-    } 
-    else {
-       Serial.println("ACCESS DENIED: Code not found or invalid format.");
+    } else {
+       Serial.println("ACCESS DENIED: Invalid Data.");
        blinkFeedback(3);
     }
   } else {
-    Serial.print("Error in Firebase read: ");
-    Serial.println(firebaseData.errorReason());
+    String errorReason = firebaseData.errorReason();
+    if (errorReason == "path not exist") {
+      Serial.println("ACCESS DENIED: PIN invalid.");
+    } else {
+      Serial.print("Error: "); Serial.println(errorReason);
+    }
     blinkFeedback(3);
   }
 }
 
-void grantAccess(bool turnOnLights) {
+void grantAccess(bool turnOnLights, long endTime) {
   digitalWrite(PIN_SOLENOID_LOCK, HIGH); // Unlock door
   if (turnOnLights) {
       digitalWrite(PIN_RELAY_LIGHTS, HIGH); // Turn on lights
+      activeSessionEndTime = endTime; // Set the kill timer
   }
   isUnlocked = true;
   unlockStartTime = millis();
@@ -222,6 +235,15 @@ void handleLockTimer() {
     // You might want another timer logic or a manual switch to turn them off.
     isUnlocked = false;
     Serial.println("Door Relocked");
+  }
+}
+
+void handleLightTimer() {
+  // If a session is active AND current time > end time
+  if (activeSessionEndTime > 0 && timeClient.getEpochTime() > activeSessionEndTime) {
+      digitalWrite(PIN_RELAY_LIGHTS, LOW); 
+      Serial.println("Session Expired: Lights OFF");
+      activeSessionEndTime = 0; 
   }
 }
 
