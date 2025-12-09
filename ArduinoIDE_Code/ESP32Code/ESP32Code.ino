@@ -4,7 +4,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
-// ================= TODO: UPDATE YOUR CREDENTIALS =================
+// ================= TODO: UPDATE WIFI SETTINGS EVERYTIME=================
 #define WIFI_SSID "KoenigseggOne1"
 #define WIFI_PASSWORD "gwt110199"
 #define FIREBASE_HOST "localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -35,10 +35,12 @@ FirebaseConfig config;
 FirebaseAuth auth;
 
 WiFiUDP ntpUDP;
-// Update offset for your timezone (e.g., UTC+8 = 8 * 3600 = 28800)
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 0); 
+
+NTPClient timeClient(ntpUDP, "time.google.com", 0); 
 
 String inputCode = "";
+String currentActivePIN = ""; // <--- NEW: Remembers who is inside
+unsigned long lastFirebaseCheck = 0; // <--- NEW: To prevent spamming Firebase
 unsigned long unlockStartTime = 0;
 bool isUnlocked = false;
 const int UNLOCK_DURATION_MS = 5000; // Keep door open for 5 seconds
@@ -53,17 +55,17 @@ void setup() {
   digitalWrite(PIN_SOLENOID_LOCK, LOW);
 
   connectToWiFi();
-  configTime(0, 0, "pool.ntp.org");
+  configTime(0, 0, "time.google.com");
 
   // === FIX 1: KEYPAD SENSITIVITY (DEBOUNCE) ===
   // Increases stability. If keys still double-press, increase to 100.
   keypad.setDebounceTime(50);
   timeClient.begin();
-  
+  timeClient.forceUpdate();
   // === FIX 2: WAIT FOR VALID TIME ===
   Serial.print("Waiting for time sync...");
   while (timeClient.getEpochTime() < 1600000000) { // Wait until year > 2020
-      timeClient.update();
+      timeClient.forceUpdate();
       delay(500);
       Serial.print(".");
   }
@@ -193,6 +195,9 @@ void checkAccessCode(String enteredCode) {
              
              // Update DB so the timer stops on the website
              Firebase.setBool(firebaseData, path + "/has_checked_in", true);
+
+             // === NEW LINE ===
+             currentActivePIN = enteredCode; // Remember this PIN!
              
              grantAccess(useLights, endTime);
            }
@@ -239,13 +244,47 @@ void handleLockTimer() {
 }
 
 void handleLightTimer() {
-  // If a session is active AND current time > end time
+  // 1. STANDARD TIME CHECK
   if (activeSessionEndTime > 0 && timeClient.getEpochTime() > activeSessionEndTime) {
-      digitalWrite(PIN_RELAY_LIGHTS, LOW); 
-      Serial.println("Session Expired: Lights OFF");
+      digitalWrite(PIN_RELAY_LIGHTS, LOW);
+      Serial.println("Session Expired (Time): Lights OFF");
       activeSessionEndTime = 0; 
+      currentActivePIN = "";
+      return;
+  }
+
+  // 2. CANCELLATION CHECK (Firebase)
+  if (activeSessionEndTime > 0 && currentActivePIN.length() > 0) {
+      
+      if (millis() - lastFirebaseCheck > 5000) {
+          lastFirebaseCheck = millis();
+
+          String path = "/rooms/" + String(ROOM_ID) + "/active_codes/" + currentActivePIN;
+
+          // Try to fetch the node
+          bool exists = Firebase.get(firebaseData, path);
+
+          if (!exists) {
+              // If Firebase.get returns FALSE → node does NOT exist
+              digitalWrite(PIN_RELAY_LIGHTS, LOW);
+              Serial.println("Booking Cancelled (Deleted Node): Lights OFF");
+              activeSessionEndTime = 0;
+              currentActivePIN = "";
+              return;
+          }
+
+          // If exists but contains null → also deleted
+          if (firebaseData.dataType() == "null") {
+              digitalWrite(PIN_RELAY_LIGHTS, LOW);
+              Serial.println("Booking Cancelled (Null): Lights OFF");
+              activeSessionEndTime = 0;
+              currentActivePIN = "";
+              return;
+          }
+      }
   }
 }
+
 
 // Simple visual feedback on the ESP32 built-in LED (usually pin 2) if something goes wrong
 void blinkFeedback(int times) {
