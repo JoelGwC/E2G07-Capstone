@@ -214,6 +214,65 @@
         margin-left: 5px;
       }
 
+      /* === CUSTOM iOS DROPDOWN === */
+      .input-group {
+        margin-bottom: 20px;
+      }
+
+      .input-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .ios-select-wrapper {
+        position: relative;
+        width: 100%;
+      }
+
+      /* The actual dropdown */
+      .ios-select {
+        width: 100%;
+        padding: 16px;
+        padding-right: 40px; /* Space for arrow */
+        font-family: inherit;
+        font-size: 17px;
+        color: var(--text-primary);
+        background-color: var(--bg-body); /* Light gray background */
+        border: none;
+        border-radius: 14px;
+        appearance: none; /* Remove default browser arrow */
+        -webkit-appearance: none;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      .ios-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--accent); /* Focus ring */
+        background-color: var(--bg-card);
+      }
+
+      /* Custom Arrow Icon */
+      .ios-select-wrapper::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: 15px;
+        transform: translateY(-50%);
+        width: 12px;
+        height: 12px;
+        pointer-events: none;
+        /* Gray Chevron SVG */
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+      }
+
       /* === MOBILE RESPONSIVENESS FIX === */
       @media (max-width: 600px) {
         /* 1. Stack the Header Vertically */
@@ -710,9 +769,20 @@
           id="modal-details"
           style="
             color: var(--text-secondary);
-            margin: 0 0 20px 0;
-            font-size: 14px;
+            margin: 0 0 25px 0;
+            font-size: 15px;
           "></p>
+
+        <div class="input-group" style="text-align: left">
+          <div class="input-label">Duration</div>
+          <div class="ios-select-wrapper">
+            <select id="modal-duration" class="ios-select">
+              <option value="1">1 Hour</option>
+              <option value="2">2 Hours</option>
+              <option value="3">3 Hours</option>
+            </select>
+          </div>
+        </div>
 
         <div
           style="
@@ -720,15 +790,15 @@
             justify-content: space-between;
             align-items: center;
             background: var(--bg-body);
-            padding: 12px 15px;
+            padding: 16px;
             border-radius: 14px;
-            margin-bottom: 15px;
+            margin-bottom: 25px;
           ">
-          <span style="font-size: 14px; font-weight: 600">Auto-Lights</span>
+          <span style="font-size: 16px; font-weight: 500">Auto-Lights</span>
           <input
             type="checkbox"
             id="modal-lights"
-            style="accent-color: var(--accent); width: 22px; height: 22px" />
+            style="accent-color: var(--accent); width: 24px; height: 24px" />
         </div>
 
         <button class="btn-modal btn-confirm" onclick="confirmBooking()">
@@ -1159,8 +1229,29 @@
         emptyMsg.style.display = found ? "none" : "block";
       }
 
+      // === UPDATED: OPEN MODAL WITH DYNAMIC DURATION ===
       window.openBookingModal = (room, date) => {
         selectedSlot = { roomId: room.id, name: room.name, time: date };
+
+        // 1. Calculate how many hours are left until closing
+        const startHour = date.getHours();
+        const hoursLeft = CLOSE_HOUR - startHour;
+
+        // 2. Set max duration (e.g., limit to 4 hours OR whatever time is left)
+        const maxDuration = Math.min(4, hoursLeft);
+
+        // 3. Rebuild the Dropdown Options dynamically
+        const durationSelect = document.getElementById("modal-duration");
+        durationSelect.innerHTML = ""; // Clear existing options
+
+        for (let i = 1; i <= maxDuration; i++) {
+          const option = document.createElement("option");
+          option.value = i;
+          option.text = i + (i === 1 ? " Hour" : " Hours");
+          durationSelect.appendChild(option);
+        }
+
+        // 4. Update UI Text
         document.getElementById("modal-details").innerHTML = `
                 Booking <strong>${room.name}</strong><br>
                 ${date.toLocaleTimeString([], {
@@ -1168,6 +1259,7 @@
                   minute: "2-digit",
                 })}
             `;
+
         document.getElementById("booking-overlay").classList.add("active");
       };
 
@@ -1181,7 +1273,8 @@
         btn.disabled = true;
         btn.textContent = "Processing...";
         const startTs = Math.floor(selectedSlot.time.getTime() / 1000);
-        const endTs = startTs + 3600;
+        const hours = parseInt(document.getElementById("modal-duration").value);
+        const endTs = startTs + hours * 3600;
         const pin = Math.floor(100000 + Math.random() * 900000).toString();
         const path = `rooms/${selectedSlot.roomId}/active_codes/${pin}`;
 
@@ -1206,7 +1299,7 @@
               to_email: auth.currentUser.email,
               pin_code: pin,
               start_time: selectedSlot.time.toLocaleString(),
-              duration: "1 Hour",
+              duration: hours + "Hour(s)",
             })
             .then(() => {
               document.getElementById("email-status").textContent =
