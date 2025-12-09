@@ -4,13 +4,11 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Workspace</title>
     <script
       type="text/javascript"
-      src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"
-    ></script>
+      src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <style>
       :root {
         /* iOS Soft Theme */
@@ -216,6 +214,32 @@
         margin-left: 5px;
       }
 
+      /* === MOBILE RESPONSIVENESS FIX === */
+      @media (max-width: 600px) {
+        /* 1. Stack the Header Vertically */
+        .ios-header {
+          flex-direction: column; /* Change from Row (side-by-side) to Column (stacked) */
+          align-items: flex-start; /* Align everything to the left */
+          gap: 20px; /* Add space between Title and User Info */
+        }
+
+        /* 2. Fix the Profile Section spacing */
+        .profile-section {
+          width: 100%;
+          justify-content: space-between; /* Push User Info left, Buttons right */
+        }
+
+        /* 3. Adjust Text Alignment */
+        .user-info {
+          text-align: left; /* Align text left instead of right */
+        }
+
+        /* 4. Shrink Title slightly if needed */
+        .header-title h1 {
+          font-size: 28px;
+        }
+      }
+
       /* === TABS === */
       .segmented-control {
         background: rgba(118, 118, 128, 0.12);
@@ -333,7 +357,9 @@
         z-index: 20;
         border-right: 1px solid var(--separator);
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
         min-width: 180px;
         color: var(--text-primary);
       }
@@ -544,34 +570,32 @@
         <img
           src="https://www.utm.my/wp-content/uploads/2022/10/LOGO-UTM.png"
           alt="UTM Logo"
-          style="width: 80%; height: auto; margin-top: 10px"
-        />
+          style="width: 80%; height: auto; margin-top: 10px" />
         <h1 style="margin: 0; font-size: 28px; font-weight: 800">
           Booking System
         </h1>
         <p
-          style="color: var(--text-secondary); margin-top: 8px; font-size: 16px"
-        >
+          style="
+            color: var(--text-secondary);
+            margin-top: 8px;
+            font-size: 16px;
+          ">
           Smart. Easy. Secure.
         </p>
         <button class="btn-google" onclick="loginWithGoogle()">
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-            />
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
             <path
               fill="#34A853"
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            />
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
             <path
               fill="#FBBC05"
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-            />
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
             <path
               fill="#EA4335"
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-            />
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
           </svg>
           Sign in with Google
         </button>
@@ -594,8 +618,7 @@
             <button
               class="btn-icon"
               onclick="toggleTheme()"
-              title="Toggle Theme"
-            >
+              title="Toggle Theme">
               🌓
             </button>
             <button class="btn-icon btn-exit" onclick="logout()" title="Logout">
@@ -609,15 +632,13 @@
         <button
           class="segment-btn active"
           id="tab-dash"
-          onclick="showView('dashboard')"
-        >
+          onclick="showView('dashboard')">
           Book Room
         </button>
         <button
           class="segment-btn"
           id="tab-my"
-          onclick="showView('my-bookings')"
-        >
+          onclick="showView('my-bookings')">
           My Reservations
         </button>
       </div>
@@ -629,8 +650,7 @@
             <div
               class="stat-val"
               id="avail-count"
-              style="color: var(--success)"
-            >
+              style="color: var(--success)">
               -
             </div>
           </div>
@@ -639,8 +659,7 @@
             <div
               class="stat-val"
               id="active-count"
-              style="color: var(--accent)"
-            >
+              style="color: var(--accent)">
               -
             </div>
           </div>
@@ -672,8 +691,7 @@
             padding: 60px 20px;
             color: var(--text-secondary);
             display: none;
-          "
-        >
+          ">
           <div style="font-size: 40px; margin-bottom: 10px; opacity: 0.5">
             📂
           </div>
@@ -694,8 +712,7 @@
             color: var(--text-secondary);
             margin: 0 0 20px 0;
             font-size: 14px;
-          "
-        ></p>
+          "></p>
 
         <div
           style="
@@ -706,14 +723,12 @@
             padding: 12px 15px;
             border-radius: 14px;
             margin-bottom: 15px;
-          "
-        >
+          ">
           <span style="font-size: 14px; font-weight: 600">Auto-Lights</span>
           <input
             type="checkbox"
             id="modal-lights"
-            style="accent-color: var(--accent); width: 22px; height: 22px"
-          />
+            style="accent-color: var(--accent); width: 22px; height: 22px" />
         </div>
 
         <button class="btn-modal btn-confirm" onclick="confirmBooking()">
@@ -728,8 +743,7 @@
     <div id="success-overlay" class="modal-overlay">
       <div class="modal">
         <div
-          style="font-size: 50px; margin-bottom: 10px; color: var(--success)"
-        >
+          style="font-size: 50px; margin-bottom: 10px; color: var(--success)">
           ✓
         </div>
         <h3 style="margin-bottom: 5px">Confirmed</h3>
@@ -744,8 +758,7 @@
             letter-spacing: 3px;
             margin: 15px 0;
             color: var(--text-primary);
-          "
-        >
+          ">
           000000
         </div>
         <div
@@ -754,8 +767,7 @@
             font-size: 13px;
             color: var(--text-secondary);
             font-weight: 500;
-          "
-        >
+          ">
           Sending Email...
         </div>
         <button class="btn-modal btn-close" onclick="closeSuccessModal()">
@@ -771,8 +783,7 @@
             color: var(--text-secondary);
             margin: 0 0 20px 0;
             font-size: 14px;
-          "
-        >
+          ">
           This action cannot be undone.
         </p>
 
@@ -780,8 +791,7 @@
           <button
             id="cancel-no"
             class="btn-modal btn-close"
-            style="flex: 1; margin-top: 0"
-          >
+            style="flex: 1; margin-top: 0">
             No
           </button>
           <button
@@ -792,8 +802,7 @@
               margin-top: 0;
               background-color: var(--danger);
               color: white;
-            "
-          >
+            ">
             Yes
           </button>
         </div>
@@ -838,10 +847,10 @@
 
       // === CONFIG ===
       const ROOMS = [
-        { id: "room_001", name: "VeCAD Room" },
-        { id: "room_002", name: "P08 216" },
-        { id: "room_003", name: "P19a 304" },
-        { id: "room_004", name: "Lab 2" },
+        { id: "room_001", name: "VeCAD Room", capcaity: 50 },
+        { id: "room_002", name: "P08 216", capcaity: 70 },
+        { id: "room_003", name: "P19a 304", capcaity: 90 },
+        { id: "room_004", name: "Lab 2", capcaity: 20 },
         // { id: "room_005", name: "Lab 3" },
         // { id: "room_006", name: "Lab 4" },
         // { id: "room_007", name: "Lab 5" },
@@ -947,14 +956,23 @@
         grid.appendChild(corner);
 
         for (let h = OPEN_HOUR; h < CLOSE_HOUR; h++) {
-          const label = new Date(0, 0, 0, h).toLocaleTimeString([], {
+          const label = new Date(0, 0, 0, h).toLocaleTimeString("en-US", {
             hour: "numeric",
+            hour12: true,
           });
           grid.appendChild(createDiv(label, "grid-header"));
         }
 
         ROOMS.forEach((room) => {
-          grid.appendChild(createDiv(room.name, "room-label"));
+          // === NEW BLOCK ===
+          // We create a custom HTML string for the label
+          const labelHTML = `
+                    <div style="line-height: 1.2;">${room.name}</div>
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                        Cap: ${room.capcaity} Pax
+                    </div>
+                `;
+          grid.appendChild(createDiv(labelHTML, "room-label"));
 
           for (let h = OPEN_HOUR; h < CLOSE_HOUR; h++) {
             let slotStart = new Date(selectedDate);
