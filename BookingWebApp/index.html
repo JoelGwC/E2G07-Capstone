@@ -486,6 +486,50 @@
         color: var(--text-primary);
       }
 
+      .footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid var(--separator);
+        text-align: center;
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      .footer-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .footer-content {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .footer a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+        transition: opacity 0.2s;
+      }
+      .footer a:hover {
+        opacity: 0.7;
+        text-decoration: underline;
+      }
+
+      .footer-note {
+        margin-top: 12px;
+        font-size: 12px;
+        background: rgba(118, 118, 128, 0.08); /* iOS Pill Background */
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-weight: 500;
+      }
+
       .hidden {
         display: none !important;
       }
@@ -756,6 +800,25 @@
       </div>
     </div>
 
+    <div class="footer">
+      <div class="footer-title">Need Help?</div>
+
+      <div class="footer-content">
+        <div>
+          Contact Puan Amirah at
+          <a href="tel:+60123456789">+60 12-3456789</a>
+        </div>
+        <div>
+          <a href="mailto:admin-support@utm.my">admin-support@utm.my</a>
+        </div>
+        <div style="margin-top: 5px">
+          Block P19A, Level 4, Undergraduate Office
+        </div>
+      </div>
+
+      <div class="footer-note">Support Hours: 08:00 – 17:30 (Daily)</div>
+    </div>
+
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
       import {
@@ -775,9 +838,9 @@
 
       // === CONFIG ===
       const ROOMS = [
-        { id: "room_001", name: "Meeting A" },
-        { id: "room_002", name: "Lab 1" },
-        { id: "room_003", name: "Studio" },
+        { id: "room_001", name: "VeCAD Room" },
+        { id: "room_002", name: "P08 216" },
+        { id: "room_003", name: "P19a 304" },
         { id: "room_004", name: "Lab 2" },
         // { id: "room_005", name: "Lab 3" },
         // { id: "room_006", name: "Lab 4" },
