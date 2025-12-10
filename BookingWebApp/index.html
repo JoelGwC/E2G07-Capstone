@@ -1237,8 +1237,8 @@
         const startHour = date.getHours();
         const hoursLeft = CLOSE_HOUR - startHour;
 
-        // 2. Set max duration (e.g., limit to 4 hours OR whatever time is left)
-        const maxDuration = Math.min(4, hoursLeft);
+        // 2. Set max duration (e.g., limit to 3 hours OR whatever time is left)
+        const maxDuration = Math.min(3, hoursLeft);
 
         // 3. Rebuild the Dropdown Options dynamically
         const durationSelect = document.getElementById("modal-duration");
