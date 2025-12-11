@@ -916,15 +916,7 @@
       } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
       // === CONFIG ===
-      const ROOMS = [
-        { id: "room_001", name: "VeCAD Room", capcaity: 50 },
-        { id: "room_002", name: "P08 216", capcaity: 70 },
-        { id: "room_003", name: "P19a 304", capcaity: 90 },
-        { id: "room_004", name: "Lab 2", capcaity: 20 },
-        // { id: "room_005", name: "Lab 3" },
-        // { id: "room_006", name: "Lab 4" },
-        // { id: "room_007", name: "Lab 5" },
-      ];
+      let ROOMS = [];
       const OPEN_HOUR = 7;
       const CLOSE_HOUR = 22;
 
@@ -965,6 +957,7 @@
           document.getElementById("user-name").textContent =
             user.displayName || "User";
           setLocalDate();
+          syncRoomConfig();
           listenToBookings();
         } else {
           document.getElementById("login-section").classList.remove("hidden");
@@ -994,16 +987,39 @@
 
       function listenToBookings() {
         document.getElementById("loading-indicator").style.display = "inline";
+
+        // We listen to the entire 'rooms' node
         onValue(ref(db, "rooms"), (snapshot) => {
-          currentBookings = snapshot.val() || {};
+          const data = snapshot.val() || {};
+          currentBookings = data;
+
+          // 1. BUILD ROOM LIST FROM DB
+          ROOMS = []; // Clear hardcoded list
+
+          Object.keys(data).forEach((roomId) => {
+            const roomData = data[roomId];
+
+            // Only add if it has a config (Name/Capacity)
+            if (roomData.config) {
+              ROOMS.push({
+                id: roomId,
+                name: roomData.config.name || "Unknown Room",
+                capcaity: roomData.config.capacity || 0, // (Keeping your spelling 'capcaity' if preferred, or fix to 'capacity')
+              });
+            }
+          });
+
+          // 2. RENDER GRID WITH NEW ROOMS
           renderGrid();
           updateStats();
+
           if (
             !document
               .getElementById("view-my-bookings")
               .classList.contains("hidden")
-          )
+          ) {
             renderMyBookings();
+          }
           document.getElementById("loading-indicator").style.display = "none";
         });
       }
@@ -1343,6 +1359,19 @@
           bookingToCancel = null;
         }
       };
+
+      // Publishes Room Names to Firebase
+      function syncRoomConfig() {
+        ROOMS.forEach((room) => {
+          // Save to: rooms/room_001/config
+          const configPath = `rooms/${room.id}/config`;
+          set(ref(db, configPath), {
+            name: room.name,
+            capacity: room.capcaity,
+          }).catch((err) => console.error("Sync Failed", err));
+        });
+        console.log("Room Config Synced to Database ✅");
+      }
 
       window.toggleTheme = () => {
         const isDark = document.body.getAttribute("data-theme") === "dark";

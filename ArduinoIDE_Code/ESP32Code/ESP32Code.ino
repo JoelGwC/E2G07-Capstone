@@ -45,6 +45,7 @@ unsigned long unlockStartTime = 0;
 bool isUnlocked = false;
 const int UNLOCK_DURATION_MS = 5000; // Keep door open for 5 seconds
 unsigned long activeSessionEndTime = 0;
+unsigned long lastRemoteCheck = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -91,6 +92,7 @@ void loop() {
   handleKeypad();
   handleLockTimer();
   handleLightTimer();
+  checkRemoteCommands(); 
 }
 
 void connectToWiFi() {
@@ -285,7 +287,40 @@ void handleLightTimer() {
   }
 }
 
+void checkRemoteCommands() {
+  // Check only every 2 seconds to save bandwidth
+  if (millis() - lastRemoteCheck > 2000) {
+    lastRemoteCheck = millis();
+    
+    // Path: rooms/room_001/remote_trigger
+    String path = "/rooms/" + String(ROOM_ID) + "/remote_trigger";
 
+    if (Firebase.getString(firebaseData, path)) {
+      String command = firebaseData.stringData();
+
+      if (command == "UNLOCK") {
+        Serial.println("REMOTE COMMAND: UNLOCK RECEIVED");
+        
+        // 1. Open the door
+        grantAccess(true, 0); // (true = lights on, 0 = no specific end time)
+        
+        // 2. Reset the trigger in DB so it doesn't loop
+        Firebase.setString(firebaseData, path, "IDLE"); 
+        
+      } 
+      else if (command == "LOCK") {
+        Serial.println("REMOTE COMMAND: LOCK RECEIVED");
+        
+        // 1. Force Lock
+        digitalWrite(PIN_SOLENOID_LOCK, LOW);
+        isUnlocked = false;
+        
+        // 2. Reset trigger
+        Firebase.setString(firebaseData, path, "IDLE");
+      }
+    }
+  }
+}
 // Simple visual feedback on the ESP32 built-in LED (usually pin 2) if something goes wrong
 void blinkFeedback(int times) {
    pinMode(2, OUTPUT);
