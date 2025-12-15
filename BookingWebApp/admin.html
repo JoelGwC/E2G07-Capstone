@@ -682,7 +682,8 @@
         <button
           class="btn"
           onclick="loginAdmin()"
-          style="width: 100%; background: var(--accent); padding: 14px">
+          style="width: 100%; background: var(--accent); padding: 14px"
+        >
           Sign in with Google
         </button>
         <p
@@ -692,7 +693,8 @@
             margin-top: 15px;
             font-size: 13px;
             font-weight: 500;
-          "></p>
+          "
+        ></p>
       </div>
     </div>
 
@@ -724,7 +726,8 @@
               background: var(--bg-card);
               color: var(--text-main);
               border: 1px solid var(--border);
-            ">
+            "
+          >
             📥 Export CSV
           </button>
         </div>
@@ -775,7 +778,8 @@
                 border: 1px solid var(--border);
                 border-radius: 8px;
                 font-family: inherit;
-              " />
+              "
+            />
           </div>
           <div class="grid-wrapper">
             <div class="schedule-scroll">
@@ -824,7 +828,8 @@
               <input
                 type="text"
                 id="new-room-name"
-                placeholder="e.g. VIP Lounge" />
+                placeholder="e.g. VIP Lounge"
+              />
             </div>
             <div class="input-wrapper" style="max-width: 100px">
               <label>Capacity</label>
@@ -837,7 +842,8 @@
                 background: var(--success);
                 height: 40px;
                 margin-bottom: 1px;
-              ">
+              "
+            >
               + Add
             </button>
           </div>
@@ -849,7 +855,8 @@
                 font-weight: 600;
                 color: var(--text-muted);
                 text-transform: uppercase;
-              ">
+              "
+            >
               Active Rooms
             </div>
           </div>
@@ -1225,7 +1232,7 @@
             occupiedRoomIds.add(b.roomId);
         });
         document.getElementById("val-available").textContent =
-          totalRooms - occupiedRoomIds.size;
+          totalRooms - occupiedRoomIds.size + "/" + totalRooms;
       }
 
       let chart1, chart2;
