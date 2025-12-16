@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <FirebaseESP32.h>
+#include <esp_now.h>
 #include <TFT_eSPI.h>
 #include <Wire.h>
 #include <NTPClient.h>
@@ -7,15 +8,26 @@
 #include <vector>
 
 // ================= USER CONFIGURATION =================
-#define WIFI_SSID       "KoenigseggOne1"
-#define WIFI_PASSWORD   "gwt110199"
+#define WIFI_SSID       "WeiCun"
+#define WIFI_PASSWORD   "GwC270303"
 #define FIREBASE_HOST   "localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define FIREBASE_AUTH   "GPK6p0wRo1MRLG0woe3t4sisdGss9jMvaLl2Lq8s"
 #define ROOM_ID         "room_001"  //Change according to desired room
 
+// --- NEW: REMOTE ESP32 CONFIGURATION ---
+// REPLACE THIS with the MAC Address of your SECOND ESP32 (Receiver)
+uint8_t receiverMac[] = {0xFC, 0xB4, 0x67, 0x74, 0x58, 0x0C};
+
+// Structure to send data
+typedef struct struct_message {
+  char device[10]; // "LOCK" or "LIGHT"
+  bool state;      // true = ON, false = OFF
+} struct_message;
+
+struct_message myData;
+esp_now_peer_info_t peerInfo;
+
 // Hardware Pins
-#define PIN_RELAY_LIGHTS  12
-#define PIN_SOLENOID_LOCK 13
 #define CTP_SDA          21
 #define CTP_SCL          22
 #define CTP_RST          33
@@ -67,16 +79,26 @@ const int VISIBLE_HEIGHT = 230; // Visible content area height
 int lastTouchY = 0;             // For drag scrolling
 bool isDragging = false;
 
+
+void sendRemoteCommand(String deviceName, bool state) {
+  strcpy(myData.device, deviceName.c_str());
+  myData.state = state;
+  
+  esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &myData, sizeof(myData));
+  
+  if (result == ESP_OK) {
+    Serial.println("Sent successfully to " + deviceName);
+  } else {
+    Serial.println("Error sending the data");
+  }
+}
+
 // ================= SETUP =================
 void setup() {
   Serial.begin(115200);
   
   // 1. Hardware Init
-  pinMode(PIN_RELAY_LIGHTS, OUTPUT);
-  pinMode(PIN_SOLENOID_LOCK, OUTPUT); 
-  digitalWrite(PIN_RELAY_LIGHTS, LOW);
-  digitalWrite(PIN_SOLENOID_LOCK, LOW);
-  
+ 
   Wire.begin(CTP_SDA, CTP_SCL);
   pinMode(CTP_RST, OUTPUT);
   digitalWrite(CTP_RST, LOW);
@@ -98,6 +120,28 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) delay(500);
   
+// --- NEW: Init ESP-NOW (Must be done AFTER WiFi is active) ---
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    drawLoading("ESP-NOW Failed");
+    delay(2000);
+  }
+
+  // Register Peer (The Remote Receiver)
+  memcpy(peerInfo.peer_addr, receiverMac, 6);
+  peerInfo.channel = 0;  // 0 means use the current WiFi channel (matches Router)
+  peerInfo.encrypt = false;
+  
+  if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    Serial.println("Failed to add peer");
+  }
+  // -------------------------------------------------------------
+  
+  // Init Remote State (Lock and Lights OFF)
+  sendRemoteCommand("LOCK", false);
+  sendRemoteCommand("LIGHT", false);
+
+
   drawLoading("Syncing Time...");
   timeClient.begin();
   while(!timeClient.update()) {
@@ -171,9 +215,10 @@ void loop() {
 
   // 3. Lock Timer
   if (isUnlocked && (millis() - unlockStartTime > 5000)) {
-    digitalWrite(PIN_SOLENOID_LOCK, LOW);
+    sendRemoteCommand("LOCK", false);
+    // --- CHANGED: Send Remote Command instead of digitalWrite ---
     isUnlocked = false;
-    Serial.println("Door Relocked");
+    Serial.println("Door Relocked (Remote)");
   }
 
   delay(30); // Reduced delay for smoother scrolling
@@ -296,8 +341,8 @@ void verifyPIN(String pin) {
       long now = timeClient.getEpochTime();
 
       if (now >= startTime && now <= endTime) {
-        digitalWrite(PIN_SOLENOID_LOCK, HIGH);
-        if(useLights) digitalWrite(PIN_RELAY_LIGHTS, HIGH);
+        sendRemoteCommand("LOCK", true); //Unlock remotely
+        if(useLights) sendRemoteCommand("LIGHT", true); // Turn on lights remotely
         isUnlocked = true;
         unlockStartTime = millis();
         Firebase.setBool(firebaseData, path + "/has_checked_in", true);
