@@ -4,13 +4,11 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Workspace</title>
     <script
       type="text/javascript"
-      src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"
-    ></script>
+      src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <style>
       :root {
         /* iOS Soft Theme */
@@ -639,6 +637,53 @@
       .hidden {
         display: none !important;
       }
+
+      /* search bar */
+      .search-container {
+        position: relative;
+        background: var(--bg-card);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 12px;
+        font-size: 14px;
+        opacity: 0.5;
+        pointer-events: none;
+      }
+
+      .clear-btn {
+        position: absolute;
+        right: 12px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: none;
+        background: var(--text-secondary);
+        color: var(--bg-card);
+        font-size: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        opacity: 0.6;
+        transition: 0.2s;
+      }
+
+      .clear-btn:hover {
+        opacity: 1;
+      }
+
+      /* Specific helper for the hidden class if not already defined */
+      .hidden {
+        display: none !important;
+      }
     </style>
   </head>
   <body>
@@ -652,34 +697,32 @@
         <img
           src="https://www.utm.my/wp-content/uploads/2022/10/LOGO-UTM.png"
           alt="UTM Logo"
-          style="width: 80%; height: auto; margin-top: 10px"
-        />
+          style="width: 80%; height: auto; margin-top: 10px" />
         <h1 style="margin: 0; font-size: 28px; font-weight: 800">
           Booking System
         </h1>
         <p
-          style="color: var(--text-secondary); margin-top: 8px; font-size: 16px"
-        >
+          style="
+            color: var(--text-secondary);
+            margin-top: 8px;
+            font-size: 16px;
+          ">
           Smart. Easy. Secure.
         </p>
         <button class="btn-google" onclick="loginWithGoogle()">
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-            />
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
             <path
               fill="#34A853"
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            />
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
             <path
               fill="#FBBC05"
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-            />
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
             <path
               fill="#EA4335"
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-            />
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
           </svg>
           Sign in with Google
         </button>
@@ -702,8 +745,7 @@
             <button
               class="btn-icon"
               onclick="toggleTheme()"
-              title="Toggle Theme"
-            >
+              title="Toggle Theme">
               🌓
             </button>
             <button class="btn-icon btn-exit" onclick="logout()" title="Logout">
@@ -717,15 +759,13 @@
         <button
           class="segment-btn active"
           id="tab-dash"
-          onclick="showView('dashboard')"
-        >
+          onclick="showView('dashboard')">
           Book Room
         </button>
         <button
           class="segment-btn"
           id="tab-my"
-          onclick="showView('my-bookings')"
-        >
+          onclick="showView('my-bookings')">
           My Reservations
         </button>
       </div>
@@ -737,8 +777,7 @@
             <div
               class="stat-val"
               id="avail-count"
-              style="color: var(--success)"
-            >
+              style="color: var(--success)">
               -
             </div>
           </div>
@@ -747,8 +786,7 @@
             <div
               class="stat-val"
               id="active-count"
-              style="color: var(--accent)"
-            >
+              style="color: var(--accent)">
               -
             </div>
           </div>
@@ -762,6 +800,32 @@
             style="display: none; font-size: 12px; color: var(--accent)"
             >Syncing...</span
           >
+        </div>
+
+        <div class="input-group" style="margin-bottom: 20px">
+          <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              id="roomSearch"
+              placeholder="Search room name..."
+              oninput="handleSearchInput()"
+              style="
+                width: 100%;
+                padding: 12px 40px;
+                border: none;
+                background: transparent;
+                font-size: 17px;
+                color: var(--text-primary);
+                outline: none;
+              " />
+            <button
+              id="clearSearch"
+              class="clear-btn hidden"
+              onclick="clearSearch()">
+              ✕
+            </button>
+          </div>
         </div>
 
         <div class="grid-wrapper">
@@ -780,8 +844,7 @@
             padding: 60px 20px;
             color: var(--text-secondary);
             display: none;
-          "
-        >
+          ">
           <div style="font-size: 40px; margin-bottom: 10px; opacity: 0.5">
             📂
           </div>
@@ -802,8 +865,7 @@
             color: var(--text-secondary);
             margin: 0 0 25px 0;
             font-size: 15px;
-          "
-        ></p>
+          "></p>
 
         <div class="input-group" style="text-align: left">
           <div class="input-label">Duration</div>
@@ -825,14 +887,12 @@
             padding: 16px;
             border-radius: 14px;
             margin-bottom: 25px;
-          "
-        >
+          ">
           <span style="font-size: 16px; font-weight: 500">Auto-Lights</span>
           <input
             type="checkbox"
             id="modal-lights"
-            style="accent-color: var(--accent); width: 24px; height: 24px"
-          />
+            style="accent-color: var(--accent); width: 24px; height: 24px" />
         </div>
 
         <button class="btn-modal btn-confirm" onclick="confirmBooking()">
@@ -847,8 +907,7 @@
     <div id="success-overlay" class="modal-overlay">
       <div class="modal">
         <div
-          style="font-size: 50px; margin-bottom: 10px; color: var(--success)"
-        >
+          style="font-size: 50px; margin-bottom: 10px; color: var(--success)">
           ✓
         </div>
         <h3 style="margin-bottom: 5px">Confirmed</h3>
@@ -863,8 +922,7 @@
             letter-spacing: 3px;
             margin: 15px 0;
             color: var(--text-primary);
-          "
-        >
+          ">
           000000
         </div>
         <div
@@ -873,8 +931,7 @@
             font-size: 13px;
             color: var(--text-secondary);
             font-weight: 500;
-          "
-        >
+          ">
           Sending Email...
         </div>
         <button class="btn-modal btn-close" onclick="closeSuccessModal()">
@@ -890,8 +947,7 @@
             color: var(--text-secondary);
             margin: 0 0 20px 0;
             font-size: 14px;
-          "
-        >
+          ">
           This action cannot be undone.
         </p>
 
@@ -899,8 +955,7 @@
           <button
             id="cancel-no"
             class="btn-modal btn-close"
-            style="flex: 1; margin-top: 0"
-          >
+            style="flex: 1; margin-top: 0">
             No
           </button>
           <button
@@ -911,8 +966,7 @@
               margin-top: 0;
               background-color: var(--danger);
               color: white;
-            "
-          >
+            ">
             Yes
           </button>
         </div>
@@ -1071,7 +1125,19 @@
         const selectedDate = new Date(
           document.getElementById("datePicker").value
         );
+        const searchQuery =
+          document.getElementById("roomSearch")?.value.toLowerCase() || ""; // Get search query
         grid.innerHTML = "";
+        // FILTER LOGIC
+        const filteredRooms = ROOMS.filter((room) =>
+          room.name.toLowerCase().includes(searchQuery)
+        );
+        // If no rooms match, show a message
+        if (filteredRooms.length === 0) {
+          grid.style.gridTemplateColumns = "1fr";
+          grid.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-secondary);">No rooms found matching "${searchQuery}"</div>`;
+          return;
+        }
 
         const totalHours = CLOSE_HOUR - OPEN_HOUR;
         grid.style.gridTemplateColumns = `180px repeat(${totalHours}, 100px)`;
@@ -1091,7 +1157,7 @@
           grid.appendChild(createDiv(label, "grid-header"));
         }
 
-        ROOMS.forEach((room) => {
+        filteredRooms.forEach((room) => {
           // === NEW BLOCK ===
           // We create a custom HTML string for the label
           const labelHTML = `
@@ -1445,6 +1511,29 @@
       window.toggleTheme = () => {
         const isDark = document.body.getAttribute("data-theme") === "dark";
         document.body.setAttribute("data-theme", isDark ? "light" : "dark");
+      };
+
+      window.handleSearchInput = () => {
+        const searchInput = document.getElementById("roomSearch");
+        const clearBtn = document.getElementById("clearSearch");
+
+        // Show/Hide clear button
+        if (searchInput.value.length > 0) {
+          clearBtn.classList.remove("hidden");
+        } else {
+          clearBtn.classList.add("hidden");
+        }
+
+        // Trigger the grid refresh
+        renderGrid();
+      };
+
+      window.clearSearch = () => {
+        const searchInput = document.getElementById("roomSearch");
+        searchInput.value = "";
+        document.getElementById("clearSearch").classList.add("hidden");
+        renderGrid();
+        searchInput.focus(); // Keep focus for user convenience
       };
     </script>
   </body>
