@@ -8,8 +8,8 @@
 #include <vector>
 
 // ================= USER CONFIGURATION =================
-#define WIFI_SSID       "WeiCun"
-#define WIFI_PASSWORD   "GwC270303"
+#define WIFI_SSID       "KoenigseggOne1"
+#define WIFI_PASSWORD   "gwt110199"
 #define FIREBASE_HOST   "localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define FIREBASE_AUTH   "GPK6p0wRo1MRLG0woe3t4sisdGss9jMvaLl2Lq8s"
 #define ROOM_ID         "room_001"  //Change according to desired room
@@ -50,7 +50,7 @@ FirebaseData firebaseData;
 FirebaseConfig config;
 FirebaseAuth auth;
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "time.google.com", 0); // no offset --> get UTC from HTML 
+NTPClient timeClient(ntpUDP, "asia.pool.ntp.org", 0); // no offset --> get UTC from HTML 
 
 struct TimeSlot {
   int hour;           // 7-22 (7AM-10PM)
@@ -70,7 +70,8 @@ String roomNameDisplay = "Loading..."; // <--- NEW DYNAMIC ROOM NAME
 unsigned long lastSyncTime = 0;
 unsigned long unlockStartTime = 0;
 bool isUnlocked = false;
-
+// NEW: Track the last state we sent to avoid spamming
+bool lastSentLightState = false;
 // Scrolling Variables
 int scrollOffset = 0;           // Current scroll position (pixels)
 int maxScrollOffset = 0;        // Maximum scroll limit
@@ -78,7 +79,7 @@ const int SLOT_HEIGHT = 60;     // Height of each time slot card
 const int VISIBLE_HEIGHT = 230; // Visible content area height
 int lastTouchY = 0;             // For drag scrolling
 bool isDragging = false;
-
+unsigned long lastManualCheckTime = 0; // <--- ADD THIS WITH YOUR GLOBALS
 
 void sendRemoteCommand(String deviceName, bool state) {
   strcpy(myData.device, deviceName.c_str());
@@ -88,6 +89,7 @@ void sendRemoteCommand(String deviceName, bool state) {
   
   if (result == ESP_OK) {
     Serial.println("Sent successfully to " + deviceName);
+    updateDeviceStatus(deviceName, state);
   } else {
     Serial.println("Error sending the data");
   }
@@ -144,10 +146,30 @@ void setup() {
 
   drawLoading("Syncing Time...");
   timeClient.begin();
-  while(!timeClient.update()) {
-    timeClient.forceUpdate();
-    delay(500);
-  }
+  // while(!timeClient.forceUpdate()) {
+  //   Serial.print(".");
+  //   delay(500);
+  // }
+
+  unsigned long startMillis = millis();
+bool synced = false;
+
+// Try to sync for a maximum of 10 seconds
+while (millis() - startMillis < 10000) {
+    if (timeClient.forceUpdate()) {
+        synced = true;
+        break;
+    }
+    Serial.print(".");
+    delay(500); 
+}
+
+if (synced) {
+    Serial.println("\nTime synced successfully!");
+} else {
+    Serial.println("\nTime sync FAILED. Proceeding with fallback...");
+    // Optional: set a default epoch or handle the failure
+}
 
   // 3. Firebase Init
   drawLoading("Connecting Database...");
@@ -172,30 +194,24 @@ void loop() {
   timeClient.update();
   bool isTouched = readTouch();
 
-  // 1. Handle Touch Interaction
+  // 1. Handle Touch Interaction (Keep as is)
   if (isTouched && !lastTouchState) {
-    // Touch Started
     lastTouchY = touchY;
     isDragging = false;
     handleTouchStart(touchX, touchY);
   } else if (isTouched && lastTouchState) {
-    // Touch Dragging
     if (currentScreen == SCREEN_SCHEDULE && touchY < 280) {
       int deltaY = touchY - lastTouchY;
       if (abs(deltaY) > 2) { 
         isDragging = true;
         scrollOffset -= deltaY; 
-        
-        // Clamp scroll
         if (scrollOffset < 0) scrollOffset = 0;
         if (scrollOffset > maxScrollOffset) scrollOffset = maxScrollOffset;
-        
         drawScheduleContent();
         lastTouchY = touchY;
       }
     }
   } else if (!isTouched && lastTouchState) {
-    // Touch Ended
     if (!isDragging) {
       handleTouchEnd(touchX, touchY);
     }
@@ -204,7 +220,51 @@ void loop() {
   
   lastTouchState = isTouched;
 
-  // 2. Periodic Firebase Sync (Every 30s)
+  // ============================================================
+  // 2. CHECK MANUAL COMMANDS (Throttled to every 1.5 seconds)
+  // ============================================================
+  if (millis() - lastManualCheckTime > 1500) { 
+    lastManualCheckTime = millis(); // Reset timer
+
+    String cmdPath = "/rooms/" + String(ROOM_ID) + "/manual_command";
+    
+    // Check if a command exists
+    if (Firebase.get(firebaseData, cmdPath)) {
+       // Check if the data is actually a JSON object (valid command)
+       if (firebaseData.dataType() == "json") {
+         FirebaseJson &json = firebaseData.jsonObject();
+         FirebaseJsonData result;
+         
+         // Get the command timestamp
+         long cmdTimestamp = 0;
+         json.get(result, "timestamp"); 
+         if(result.success) cmdTimestamp = result.intValue;
+
+         // Only execute if command is new (within last 10 seconds)
+         // This prevents old commands from re-triggering on restart
+         long now = timeClient.getEpochTime() * 1000LL; 
+         
+         if (abs(now - cmdTimestamp) < 10000) { 
+            String device = "";
+            bool state = false;
+            
+            json.get(result, "device"); if(result.success) device = result.stringValue;
+            json.get(result, "state"); if(result.success) state = result.boolValue;
+            
+            // Execute Command
+            Serial.println("Manual Command Detected: " + device + " -> " + String(state));
+            sendRemoteCommand(device, state);
+            
+            // Delete the node so we don't process it again
+            Firebase.deleteNode(firebaseData, cmdPath); 
+         }
+       }
+    }
+  }
+
+  // ============================================================
+  // 3. PERIODIC FULL SYNC (Every 30s)
+  // ============================================================
   if (millis() - lastSyncTime > 30000) {
     initializeTimeSlots();
     fetchSchedule();
@@ -213,17 +273,15 @@ void loop() {
     lastSyncTime = millis();
   }
 
-  // 3. Lock Timer
+  // 4. Lock Timer
   if (isUnlocked && (millis() - unlockStartTime > 5000)) {
     sendRemoteCommand("LOCK", false);
-    // --- CHANGED: Send Remote Command instead of digitalWrite ---
     isUnlocked = false;
     Serial.println("Door Relocked (Remote)");
   }
 
-  delay(30); // Reduced delay for smoother scrolling
+  delay(30); 
 }
-
 // ================= FIREBASE LOGIC =================
 
 void initializeTimeSlots() {
@@ -263,7 +321,8 @@ void fetchSchedule() {
     slot.isBooked = false;
     slot.bookedBy = "";
   }
-
+// --- NEW: LIGHTS STATE TRACKER ---
+  bool shouldLightsBeOn = false;
   // 2. Fetch Data
   if (Firebase.get(firebaseData, path)) {
     FirebaseJson &json = firebaseData.jsonObject();
@@ -273,7 +332,7 @@ void fetchSchedule() {
 
     // Timezone Logic (UTC to Malaysia)
     long nowUTC = timeClient.getEpochTime();
-    long offsetSeconds = 28800; // 8 Hours
+    long offsetSeconds = 28800; // 8 Hours (Malaysia)
     long nowLocal = nowUTC + offsetSeconds; 
     long todayStartLocal = (nowLocal / 86400) * 86400; //not redundant --> rounding down
     long todayEndLocal = todayStartLocal + 86400;      
@@ -286,6 +345,7 @@ void fetchSchedule() {
       FirebaseJsonData result;
       
       long startTimeUTC = 0, endTimeUTC = 0;
+      bool hasCheckedIn = false; // <--- NEW CHECK
       String createdBy = "";
       
       subJson.get(result, "start_time"); if(result.success) startTimeUTC = result.intValue;
@@ -294,6 +354,13 @@ void fetchSchedule() {
 
       long startTimeLocal = startTimeUTC + offsetSeconds;
       long endTimeLocal   = endTimeUTC   + offsetSeconds;
+
+
+      // --- LOGIC: IS THIS BOOKING ACTIVE RIGHT NOW? ---
+      // If "Now" is inside the booking window AND they have already entered via PIN
+      if (nowLocal >= startTimeLocal && nowLocal < endTimeLocal && hasCheckedIn) {
+         shouldLightsBeOn = true;
+      }
 
       if (endTimeLocal > todayStartLocal && startTimeLocal < todayEndLocal) {
         time_t st = startTimeLocal;
@@ -319,6 +386,17 @@ void fetchSchedule() {
       }
     }
     json.iteratorEnd();
+  }
+// Only send the command if the state has CHANGED
+  if (shouldLightsBeOn != lastSentLightState) {
+    sendRemoteCommand("LIGHT", shouldLightsBeOn);
+    lastSentLightState = shouldLightsBeOn; // Update the memory
+    
+    if(shouldLightsBeOn) {
+      Serial.println("Auto-Sync: Lights turned ON");
+    } else {
+      Serial.println("Auto-Sync: Lights turned OFF");
+    }
   }
 }
 
@@ -355,6 +433,7 @@ void verifyPIN(String pin) {
     }
   } else {
     showAccessResult(false);
+    
   }
   
   delay(2000);
@@ -657,4 +736,13 @@ int getCurrentLocalHour() {
   time_t nowT = nowLocal;
   struct tm * tmNow = localtime(&nowT);
   return tmNow->tm_hour;
+}
+
+void updateDeviceStatus(String device, bool state) {
+  String path = "/rooms/" + String(ROOM_ID) + "/status/" + device;
+  if (Firebase.setBool(firebaseData, path, state)) {
+    Serial.println("Updated Firebase: " + device + " -> " + String(state));
+  } else {
+    Serial.println("Failed to update Firebase: " + firebaseData.errorReason());
+  }
 }

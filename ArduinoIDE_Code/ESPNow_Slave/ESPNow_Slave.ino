@@ -2,8 +2,8 @@
 #include <WiFi.h>
 
 // ================= CONFIGURATION =================
-#define WIFI_SSID       "WeiCun"
-#define WIFI_PASSWORD   "GwC270303"
+#define WIFI_SSID       "KoenigseggOne1"
+#define WIFI_PASSWORD   "gwt110199"
 
 // Pins on the Receiver ESP32
 #define PIN_RELAY_LIGHTS  13
