@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Workspace</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"
+    ></script>
     <style>
       :root {
         --bg-body: #f5f5f7;
@@ -1206,6 +1210,7 @@
         onValue,
         set,
         remove,
+        get, // <--- ADD THIS
       } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
       // === CONFIG ===
@@ -1218,7 +1223,15 @@
           "https://localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "localtest-0327",
       };
+      // === EMAIL CONFIG ===
+      const emailConfig = {
+        service: "service_bxvgznl", // Same as index.html
+        template: "template_3e4foho", // <--- CREATE THIS IN EMAILJS DASHBOARD
+        key: "tTukxfNhCFbPnEX2O", // Same as index.html
+      };
 
+      // Initialize EmailJS
+      emailjs.init(emailConfig.key);
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
       const db = getDatabase(app);
@@ -1274,16 +1287,55 @@
       };
       window.confirmRevoke = () => {
         if (pendingRevoke) {
-          remove(
-            ref(
-              db,
-              `rooms/${pendingRevoke.roomId}/active_codes/${pendingRevoke.pin}`
-            )
-          )
-            .then(() => {
-              window.closeModal();
+          const { roomId, pin } = pendingRevoke;
+          const path = `rooms/${roomId}/active_codes/${pin}`;
+          const dbRef = ref(db, path);
+
+          // 1. Get the booking details (we need the email address)
+          get(dbRef)
+            .then((snapshot) => {
+              if (snapshot.exists()) {
+                const booking = snapshot.val();
+                const userEmail = booking.created_by;
+                const startTime = new Date(
+                  booking.start_time * 1000
+                ).toLocaleString();
+
+                // 2. Send the Email Notification
+                emailjs
+                  .send(emailConfig.service, emailConfig.template, {
+                    to_email: userEmail,
+                    room_name: booking.roomName || roomId, // Fallback if name isn't saved in booking
+                    time_slot: startTime,
+                    reason: "Administrative Action",
+                  })
+                  .then(() => {
+                    console.log("Revocation email sent to " + userEmail);
+                  })
+                  .catch((err) => {
+                    console.error("Failed to send email:", err);
+                  });
+              }
+
+              // 3. Proceed to Delete from Database
+              return remove(dbRef);
             })
-            .catch((err) => window.showAlert("Error", err.message, "❌")); // REPLACED ALERT
+            .then(() => {
+              // 4. (Optional) Force Lock the Room immediately
+              // This calls your existing helper to turn off lights/lock door
+              window.remoteControl(roomId, "LOCK", false);
+              window.remoteControl(roomId, "LIGHT", false);
+
+              window.closeModal();
+              window.showAlert(
+                "Revoked",
+                "Booking cancelled and user notified.",
+                "✅"
+              );
+            })
+            .catch((err) => {
+              window.showAlert("Error", err.message, "❌");
+            });
         }
       };
 
