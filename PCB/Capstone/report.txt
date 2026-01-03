@@ -1,0 +1,13 @@
+Warning: Width correction constrained.  The width correction value must be in the range of [0.000001 mm; 0.199999 mm] for the current design rules.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-F_Cu.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-B_Cu.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-F_Paste.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-B_Paste.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-F_Silkscreen.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-B_Silkscreen.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-F_Mask.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-B_Mask.gbr'.
+Plotted to 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-Edge_Cuts.gbr'.
+Created Gerber job file 'C:\Users\User\Documents\E2G07-Capstone\PCB\Capstone\Capstone-job.gbrjob'.
+Info: Done.
+Info: Done.

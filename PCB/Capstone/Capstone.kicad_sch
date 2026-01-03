@@ -1238,6 +1238,16 @@
 	)
 	(wire
 		(pts
+			(xy 119.38 74.93) (xy 120.65 74.93)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "848848d8-1d1b-4550-acc2-655b590381a9")
+	)
+	(wire
+		(pts
 			(xy 76.2 54.61) (xy 85.09 54.61)
 		)
 		(stroke
@@ -1355,6 +1365,16 @@
 			(type default)
 		)
 		(uuid "ed73ae03-5b73-4c38-b9c5-f88b64043782")
+	)
+	(wire
+		(pts
+			(xy 119.38 77.47) (xy 120.65 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f29f9176-b618-475d-ad11-8d854d691697")
 	)
 	(label "LED"
 		(at 146.05 73.66 0)
@@ -1517,7 +1537,7 @@
 		(uuid "92fc44b5-06b7-46c4-bb6f-a5fd6c3d4e49")
 	)
 	(label "CTP_RST"
-		(at 119.38 74.93 0)
+		(at 120.65 74.93 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -1587,7 +1607,7 @@
 		(uuid "f55b9644-96d3-4cc1-b3e2-a526dbdb2552")
 	)
 	(label "CTP_INT"
-		(at 119.38 72.39 0)
+		(at 120.65 77.47 0)
 		(effects
 			(font
 				(size 1.27 1.27)
