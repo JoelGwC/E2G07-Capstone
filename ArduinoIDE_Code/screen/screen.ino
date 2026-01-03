@@ -8,8 +8,8 @@
 #include <vector>
 
 // ================= USER CONFIGURATION =================
-#define WIFI_SSID       "KoenigseggOne1"
-#define WIFI_PASSWORD   "gwt110199"
+#define WIFI_SSID       "WeiCun"
+#define WIFI_PASSWORD   "GwC270303"
 #define FIREBASE_HOST   "localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define FIREBASE_AUTH   "GPK6p0wRo1MRLG0woe3t4sisdGss9jMvaLl2Lq8s"
 #define ROOM_ID         "room_001"  //Change according to desired room
