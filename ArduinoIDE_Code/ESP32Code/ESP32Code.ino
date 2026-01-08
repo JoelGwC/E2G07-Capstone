@@ -146,7 +146,7 @@ void checkAccessCode(String enteredCode) {
       long startTime = 0;
       long endTime = 0;
       long createdAt = 0; // <--- 1. NEW VARIABLE
-      bool useLights = false;
+      bool useLights = true;
       bool hasCheckedIn = false;
 
       // Parse JSON
@@ -161,8 +161,6 @@ void checkAccessCode(String enteredCode) {
       json.get(jsonData, "created_at");
       if (jsonData.success) createdAt = jsonData.intValue;
 
-      json.get(jsonData, "use_lights");
-      if (jsonData.success) useLights = jsonData.boolValue;
       
       json.get(jsonData, "has_checked_in");
       if (jsonData.success) hasCheckedIn = jsonData.boolValue;

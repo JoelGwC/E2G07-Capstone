@@ -618,7 +618,7 @@ void drawKeypadContent(bool partialUpdate) {
 
   // --- DYNAMIC DRAWING (Text Input) ---
   // Runs every time you press a key. 
-  // We use a Viewport to restrict drawing to ONLY the text box area.
+  //  use a Viewport to restrict drawing to ONLY the text box area.
   
   // 1. Define active area (Inside the white border)
   tft.setViewport(102, 52, 276, 36);
