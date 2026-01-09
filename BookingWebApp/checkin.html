@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Room Access</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <style>
+      :root {
+        --bg-color: #000000;
+        --card-color: #212424;
+        --accent-color: #10a210;
+        --busy-color: #d00000;
+        --text-color: #ffffff;
+      }
+
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .card {
+        background-color: var(--card-color);
+        border-radius: 12px;
+      }
+
+      .key-btn {
+        background-color: var(--card-color);
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.1s;
+        box-shadow: 0 4px 0 #1a1c1c;
+      }
+      .key-btn:active {
+        transform: translateY(4px);
+        box-shadow: none;
+      }
+
+      /* Modal Animation */
+      .modal-enter {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      .modal-enter-active {
+        opacity: 1;
+        transform: scale(1);
+        transition: all 0.2s ease-out;
+      }
+      .modal-exit {
+        opacity: 1;
+        transform: scale(1);
+      }
+      .modal-exit-active {
+        opacity: 0;
+        transform: scale(0.9);
+        transition: all 0.2s ease-in;
+      }
+    </style>
+  </head>
+  <body
+    class="h-screen flex flex-col max-w-md mx-auto border-x border-gray-800 relative"
+  >
+    <header
+      class="p-4 border-b border-gray-700 bg-[#212424] flex justify-between items-center sticky top-0 z-40"
+    >
+      <div>
+        <h1 id="roomName" class="text-xl font-bold tracking-wider">
+          LOADING...
+        </h1>
+        <p id="clock" class="text-xs text-gray-400">--:--</p>
+      </div>
+      <div
+        id="statusBadge"
+        class="bg-gray-600 px-3 py-1 rounded-full text-xs font-bold"
+      >
+        ...
+      </div>
+    </header>
+
+    <nav class="flex p-2 gap-2 bg-black sticky top-[73px] z-30">
+      <button
+        onclick="switchTab('schedule')"
+        id="tab-schedule"
+        class="flex-1 py-2 rounded-lg font-bold bg-[#10A210] text-white transition"
+      >
+        SCHEDULE
+      </button>
+      <button
+        onclick="switchTab('keypad')"
+        id="tab-keypad"
+        class="flex-1 py-2 rounded-lg font-bold bg-[#212424] text-gray-400 transition"
+      >
+        ENTER PIN
+      </button>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto p-4 relative z-0">
+      <div id="view-schedule" class="space-y-3 pb-4">
+        <div id="scheduleList" class="space-y-3"></div>
+      </div>
+
+      <div id="view-keypad" class="hidden h-full flex flex-col">
+        <div class="mb-6">
+          <div
+            class="h-16 border-2 border-gray-600 rounded-xl flex items-center justify-center bg-[#212424]"
+          >
+            <span
+              id="pinDisplay"
+              class="text-3xl font-mono tracking-[0.5em] text-white"
+            ></span>
+          </div>
+          <p id="pinStatus" class="text-center text-xs mt-2 text-gray-400 h-4">
+            Enter 6-digit PIN
+          </p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 flex-1 max-h-[400px]">
+          <button class="key-btn" onclick="addPin('1')">1</button>
+          <button class="key-btn" onclick="addPin('2')">2</button>
+          <button class="key-btn" onclick="addPin('3')">3</button>
+          <button class="key-btn" onclick="addPin('4')">4</button>
+          <button class="key-btn" onclick="addPin('5')">5</button>
+          <button class="key-btn" onclick="addPin('6')">6</button>
+          <button class="key-btn" onclick="addPin('7')">7</button>
+          <button class="key-btn" onclick="addPin('8')">8</button>
+          <button class="key-btn" onclick="addPin('9')">9</button>
+          <button class="key-btn bg-red-900 text-red-200" onclick="clearPin()">
+            C
+          </button>
+          <button class="key-btn" onclick="addPin('0')">0</button>
+          <button
+            class="key-btn bg-green-900 text-green-200"
+            onclick="submitPin()"
+          >
+            E
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <div
+      id="resultModal"
+      class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300"
+    >
+      <div
+        id="modalCard"
+        class="bg-[#212424] p-8 rounded-2xl flex flex-col items-center text-center max-w-[80%] shadow-2xl border border-gray-700 transform scale-90 transition-transform duration-300"
+      >
+        <div
+          id="modalIconBg"
+          class="w-20 h-20 rounded-full flex items-center justify-center mb-4 text-4xl"
+        >
+          <i id="modalIcon" class="fa-solid fa-check"></i>
+        </div>
+
+        <h2 id="modalTitle" class="text-2xl font-bold mb-2 text-white">
+          ACCESS GRANTED
+        </h2>
+        <p id="modalMsg" class="text-gray-400 text-sm mb-6">
+          Door unlocked successfully.
+        </p>
+
+        <button
+          onclick="closeModal()"
+          class="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-bold transition"
+        >
+          CLOSE
+        </button>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+      import {
+        getDatabase,
+        ref,
+        onValue,
+        set,
+        get,
+      } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+      // === CONFIGURATION ===
+      const firebaseConfig = {
+        apiKey: "AIzaSyB0XjpqmXA7wab9EBNvzo-8abHxjJnDqdk",
+        authDomain: "localtest-0327.firebaseapp.com",
+        databaseURL:
+          "https://localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "localtest-0327",
+        storageBucket: "localtest-0327.appspot.com",
+        messagingSenderId: "619374002435",
+        appId: "1:619374002435:web:c66e8326a677a71bf22936",
+      };
+
+      const ROOM_ID = "room_001";
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+
+      let currentPin = "";
+      let bookings = [];
+
+      // 1. Clock & Room Name
+      function updateClock() {
+        document.getElementById("clock").innerText =
+          new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+      }
+      setInterval(updateClock, 1000);
+      updateClock();
+
+      onValue(ref(db, `/rooms/${ROOM_ID}/config/name`), (s) => {
+        document.getElementById("roomName").innerText = (
+          s.val() || "ROOM 001"
+        ).toUpperCase();
+      });
+
+      // 2. Tab Switching
+      window.switchTab = (tab) => {
+        document.getElementById("view-schedule").className =
+          tab === "schedule" ? "space-y-3 pb-4" : "hidden";
+        document.getElementById("view-keypad").className =
+          tab === "keypad" ? "hidden h-full flex flex-col" : "hidden"; // Fixed hidden logic
+
+        if (tab === "keypad") {
+          document.getElementById("view-keypad").classList.remove("hidden");
+          document.getElementById("tab-keypad").className =
+            "flex-1 py-2 rounded-lg font-bold bg-[#10A210] text-white transition";
+          document.getElementById("tab-schedule").className =
+            "flex-1 py-2 rounded-lg font-bold bg-[#212424] text-gray-400 transition";
+        } else {
+          document.getElementById("tab-schedule").className =
+            "flex-1 py-2 rounded-lg font-bold bg-[#10A210] text-white transition";
+          document.getElementById("tab-keypad").className =
+            "flex-1 py-2 rounded-lg font-bold bg-[#212424] text-gray-400 transition";
+        }
+      };
+
+      // 3. PIN & MODAL Logic
+      window.addPin = (d) => {
+        if (currentPin.length < 6) {
+          currentPin += d;
+          updatePinDisplay();
+        }
+      };
+      window.clearPin = () => {
+        currentPin = "";
+        updatePinDisplay();
+      };
+      function updatePinDisplay() {
+        document.getElementById("pinDisplay").innerText = currentPin;
+      }
+
+      // --- NEW: MODAL FUNCTIONS ---
+      function showModal(success, title, message) {
+        const modal = document.getElementById("resultModal");
+        const card = document.getElementById("modalCard");
+        const iconBg = document.getElementById("modalIconBg");
+        const icon = document.getElementById("modalIcon");
+        const titleEl = document.getElementById("modalTitle");
+        const msgEl = document.getElementById("modalMsg");
+
+        // Set Content
+        titleEl.innerText = title;
+        msgEl.innerText = message;
+
+        // Set Styles
+        if (success) {
+          iconBg.className =
+            "w-20 h-20 rounded-full flex items-center justify-center mb-4 text-4xl bg-green-900 text-green-400";
+          icon.className = "fa-solid fa-check";
+          titleEl.className = "text-2xl font-bold mb-2 text-green-500";
+        } else {
+          iconBg.className =
+            "w-20 h-20 rounded-full flex items-center justify-center mb-4 text-4xl bg-red-900 text-red-400";
+          icon.className = "fa-solid fa-xmark";
+          titleEl.className = "text-2xl font-bold mb-2 text-red-500";
+        }
+
+        // Show Animation
+        modal.classList.remove("hidden");
+        // Small delay to allow 'hidden' removal to register before opacity transition
+        requestAnimationFrame(() => {
+          modal.classList.remove("opacity-0");
+          card.classList.remove("scale-90");
+          card.classList.add("scale-100");
+        });
+      }
+
+      window.closeModal = () => {
+        const modal = document.getElementById("resultModal");
+        const card = document.getElementById("modalCard");
+
+        modal.classList.add("opacity-0");
+        card.classList.remove("scale-100");
+        card.classList.add("scale-90");
+
+        setTimeout(() => {
+          modal.classList.add("hidden");
+          clearPin(); // Auto clear PIN on close
+        }, 300);
+      };
+
+      window.submitPin = async () => {
+        if (currentPin.length === 0) return;
+
+        document.getElementById("pinStatus").innerText = "Verifying...";
+
+        try {
+          const snap = await get(
+            ref(db, `/rooms/${ROOM_ID}/active_codes/${currentPin}`)
+          );
+          if (snap.exists()) {
+            const data = snap.val();
+            const now = Math.floor(Date.now() / 1000);
+
+            if (now >= data.start_time && now <= data.end_time) {
+              // SUCCESS
+              showModal(true, "ACCESS GRANTED", "Door unlocked. Welcome!");
+
+              // Send Commands
+              const cmdRef = ref(db, `/rooms/${ROOM_ID}/manual_command`);
+              await set(cmdRef, {
+                device: "LOCK",
+                state: true,
+                timestamp: Date.now(),
+              });
+
+              if (data.use_lights) {
+                setTimeout(() => {
+                  set(cmdRef, {
+                    device: "LIGHT",
+                    state: true,
+                    timestamp: Date.now(),
+                  });
+                }, 500);
+              }
+
+              await set(
+                ref(
+                  db,
+                  `/rooms/${ROOM_ID}/active_codes/${currentPin}/has_checked_in`
+                ),
+                true
+              );
+            } else {
+              // EXPIRED
+              showModal(
+                false,
+                "ACCESS DENIED",
+                "This PIN is not valid at this time."
+              );
+            }
+          } else {
+            // INVALID
+            showModal(false, "ACCESS DENIED", "Invalid PIN entered.");
+          }
+        } catch (error) {
+          console.error(error);
+          showModal(false, "ERROR", "Network connection failed.");
+        }
+        document.getElementById("pinStatus").innerText = "Enter 6-digit PIN";
+      };
+
+      // 4. Schedule Logic
+      onValue(ref(db, `/rooms/${ROOM_ID}/active_codes`), (snap) => {
+        bookings = snap.val()
+          ? Object.values(snap.val()).map((b) =>
+              typeof b === "string" ? JSON.parse(b) : b
+            )
+          : [];
+        renderSchedule();
+      });
+      setInterval(renderSchedule, 60000);
+
+      function renderSchedule() {
+        const list = document.getElementById("scheduleList");
+        list.innerHTML = "";
+        const now = new Date();
+        const currentHour = now.getHours();
+        let isOccupied = false;
+
+        if (currentHour > 22) {
+          list.innerHTML = `<div class="text-center text-gray-500 py-10">No more slots today.</div>`;
+          return;
+        }
+
+        for (let h = currentHour; h <= 22; h++) {
+          const start = new Date();
+          start.setHours(h, 0, 0, 0);
+          const end = new Date();
+          end.setHours(h + 1, 0, 0, 0);
+          let bookedBy = null;
+
+          bookings.forEach((b) => {
+            if (
+              b.start_time * 1000 < end.getTime() &&
+              b.end_time * 1000 > start.getTime()
+            ) {
+              bookedBy = b.created_by ? b.created_by.split("@")[0] : "User";
+              if (h === currentHour) isOccupied = true;
+            }
+          });
+
+          const timeStr = start.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          });
+          const isBooked = bookedBy !== null;
+
+          const card = document.createElement("div");
+          card.className = `card p-3 flex justify-between items-center border-l-4 ${
+            isBooked ? "border-red-600" : "border-green-600"
+          }`;
+          card.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="text-lg font-mono font-bold">${timeStr}</span>
+                        <span class="text-xs text-gray-400">${
+                          isBooked ? bookedBy : "Available"
+                        }</span>
+                    </div>
+                    <div class="px-3 py-1 rounded text-xs font-bold ${
+                      isBooked
+                        ? "bg-red-900 text-red-200"
+                        : "bg-green-900 text-green-200"
+                    }">
+                        ${isBooked ? "BOOKED" : "FREE"}
+                    </div>`;
+          list.appendChild(card);
+        }
+
+        const badge = document.getElementById("statusBadge");
+        badge.innerText = isOccupied ? "OCCUPIED" : "AVAILABLE";
+        badge.className = `px-3 py-1 rounded-full text-xs font-bold ${
+          isOccupied ? "bg-red-600" : "bg-green-600"
+        }`;
+      }
+    </script>
+  </body>
+</html>
