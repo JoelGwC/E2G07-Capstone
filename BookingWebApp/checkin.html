@@ -90,7 +90,7 @@
         <h1 id="roomName" class="text-2xl md:text-3xl font-bold tracking-wider">
           LOADING...
         </h1>
-        <p id="clock" class="text-sm md:text-base text-gray-400 mt-1">--:--</p>
+        <p id="clock" class="text-sm md:text-base text-gray-400 mt-1 uppercase">--:--</p>
       </div>
       <div
         id="statusBadge"
@@ -242,6 +242,7 @@
           new Date().toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
+            hour12: true,
           });
       }
       setInterval(updateClock, 1000);
@@ -345,7 +346,8 @@
         c.classList.add("scale-90");
         setTimeout(() => {
           m.classList.add("hidden");
-          clearPin();
+          currentPin = "";
+          updatePinDisplay();
         }, 300);
       };
 
@@ -366,7 +368,9 @@
                 device: "LOCK",
                 state: true,
                 timestamp: Date.now(),
+                  
               });
+              
               if (data.use_lights)
                 setTimeout(
                   () =>
@@ -390,6 +394,8 @@
         } catch (e) {
           showModal(false, "ERROR", "Network Error");
         }
+        currentPin = "";
+        updatePinDisplay();
         document.getElementById("pinStatus").innerText = "Enter 6-digit PIN";
       };
 
@@ -409,7 +415,9 @@
         list.innerHTML = "";
         const now = new Date();
         const currentHour = now.getHours();
+        const nowSeconds = Math.floor(Date.now() / 1000);
         let isOccupied = false;
+        const DEADLINE = 15;
 
         if (currentHour > 21) {
           list.innerHTML = `<div class="text-center text-gray-500 py-20 text-xl font-light">No more slots today.</div>`;
@@ -422,15 +430,19 @@
           const end = new Date();
           end.setHours(h + 1, 0, 0, 0);
           let bookedBy = null;
+          
 
           bookings.forEach((b) => {
             if (
               b.start_time * 1000 < end.getTime() &&
-              b.end_time * 1000 > start.getTime()
+              b.end_time * 1000 > start.getTime() 
             ) {
+              if(nowSeconds > (b.start_time + DEADLINE * 60) && !b.has_checked_in) {return;}
+              {
               bookedBy = b.created_by ? b.created_by.split("@")[0] : "User";
               if (h === currentHour) isOccupied = true;
             }
+          }
           });
 
           const timeStr = start.toLocaleTimeString([], {
@@ -448,7 +460,7 @@
 
           card.innerHTML = `
                     <div class="flex flex-col gap-1">
-                        <span class="text-2xl md:text-3xl font-mono font-bold text-gray-100 tracking-wide">${timeStr}</span>
+                        <span class="text-2xl md:text-3xl font-mono font-bold text-gray-100 tracking-wide uppercase">${timeStr}</span>
                         <span class="text-base md:text-lg text-gray-400 font-light">${
                           isBooked ? bookedBy : "Available"
                         }</span>
