@@ -1,76 +1,134 @@
-#include <esp_now.h>
 #include <WiFi.h>
+#include <FirebaseESP32.h>
+#include <ESP32Servo.h>
 
 // ================= CONFIGURATION =================
 #define WIFI_SSID       "KoenigseggOne1"
 #define WIFI_PASSWORD   "gwt110199"
+#define FIREBASE_HOST   "localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app"
+#define FIREBASE_AUTH   "GPK6p0wRo1MRLG0woe3t4sisdGss9jMvaLl2Lq8s"
+#define ROOM_ID         "room_001" 
 
-// Pins on the Receiver ESP32
-#define PIN_RELAY_LIGHTS  13
-#define PIN_SOLENOID_LOCK 2
+// Hardware Pins
+#define PIN_RELAY_LIGHTS  14
+static const int servoPin = 13;
 
-// Data structure must match the sender
-typedef struct struct_message {
-  char device[10];
-  bool state;
-} struct_message;
+// Objects
+Servo servo1;
+bool currentLockState = false; // <--- ADD THIS to track the servo's current position
+FirebaseData streamData; // <--- NEW: Dedicated object for streaming
+// FirebaseData fbData; // For Reading
+FirebaseData fbWrite; // For Writing
+FirebaseConfig config;
+FirebaseAuth auth;
 
-struct_message myData;
-
-// Callback function when data is received
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
-  memcpy(&myData, incomingData, sizeof(myData));
-  
-  Serial.print("Command Received: ");
-  Serial.print(myData.device);
-  Serial.print(" -> ");
-  Serial.println(myData.state ? "ON" : "OFF");
-
-  if (String(myData.device) == "LIGHT") {
-    digitalWrite(PIN_RELAY_LIGHTS, myData.state ? HIGH : LOW);
-  } 
-  else if (String(myData.device) == "LOCK") {
-    digitalWrite(PIN_SOLENOID_LOCK, myData.state ? HIGH : LOW);
-  }
-}
+// State Tracking
+unsigned long lastCheckTime = 0;
+const int checkInterval = 3000; // Check every 1 second
 
 void setup() {
   Serial.begin(115200);
-  
-  pinMode(PIN_RELAY_LIGHTS, OUTPUT);
-  pinMode(PIN_SOLENOID_LOCK, OUTPUT);
-  
-  // Initialize to OFF
-  digitalWrite(PIN_RELAY_LIGHTS, LOW);
-  digitalWrite(PIN_SOLENOID_LOCK, LOW);
 
-  // Set device as a Wi-Fi Station
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  // 1. Hardware Init
+  pinMode(PIN_RELAY_LIGHTS, OUTPUT);
+  digitalWrite(PIN_RELAY_LIGHTS, LOW); 
   
-  // Wait for connection (Ensures we are on the correct Channel)
+  servo1.attach(servoPin);
+  servo1.write(180); 
+
+  // 2. WiFi Connection
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nWiFi Connected. Channel: " + String(WiFi.channel()));
+  Serial.println("\nWiFi Connected.");
 
-  // Init ESP-NOW
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
-    return;
+  // 3. Firebase Init
+  config.host = FIREBASE_HOST;
+  config.signer.tokens.legacy_token = FIREBASE_AUTH;
+  streamData.setBSSLBufferSize(16384, 1024);
+  fbWrite.setBSSLBufferSize(16384, 1024);
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+  if (!Firebase.beginStream(streamData, "/rooms/" + String(ROOM_ID))) {
+    Serial.println("Stream Begin Error: " + streamData.errorReason());
   }
-
-  // Register callback
-  esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
   
-  Serial.println("Receiver Ready. Waiting for commands...");
-  Serial.print("My MAC Address: ");
-  Serial.println(WiFi.macAddress()); // Use this MAC in the Sender code
+  // When a change happens, run the function 'onStreamCallback'
+  Firebase.setStreamCallback(streamData, onStreamCallback, onStreamTimeout);
 }
 
+
 void loop() {
-  // Nothing to do here, ESP-NOW is interrupt based
-  delay(1000); 
+  
+}
+
+// =========================================================
+//  STREAM CALLBACK (Runs automatically on change)
+// =========================================================
+void onStreamCallback(StreamData data) {
+  
+  String path = data.dataPath(); 
+  Serial.println("Stream Update: " + path + " -> " + data.stringData());
+
+  // ---------------------------------------------
+  // A. STATUS UPDATES (Lights or Lock changed)
+  // ---------------------------------------------
+  if (path == "/status/LIGHT") {
+    bool targetState = data.boolData();
+    digitalWrite(PIN_RELAY_LIGHTS, targetState ? HIGH : LOW);
+  }
+
+  else if (path == "/status/LOCK") {
+    bool targetState = data.boolData();
+    // Anti-Jitter Fix: Only move if different
+    if (targetState != currentLockState) {
+       servo1.write(targetState ? 0 : 180);
+       currentLockState = targetState;
+       Serial.println("Servo Moved.");
+    }
+  }
+
+  // ---------------------------------------------
+  // B. MANUAL COMMANDS (From Admin Panel)
+  // ---------------------------------------------
+  else if (path.indexOf("/manual_command") > -1) {
+    // If we detect ANY change in "manual_command", we fetch the whole object
+    // using fbWrite to ensure we get clean data (Device + State).
+    
+    if (Firebase.get(fbWrite, "/rooms/" + String(ROOM_ID) + "/manual_command")) {
+       FirebaseJson &json = fbWrite.jsonObject();
+       FirebaseJsonData result;
+       
+       String device = "";
+       bool state = false;
+
+       json.get(result, "device"); 
+       if(result.success) device = result.stringValue;
+       
+       json.get(result, "state"); 
+       if(result.success) state = result.boolValue;
+
+       if (device != "") {
+         Serial.println("EXECUTING CMD: " + device);
+         
+         // 1. Execute
+         if (device == "LIGHT") digitalWrite(PIN_RELAY_LIGHTS, state ? HIGH : LOW);
+         if (device == "LOCK")  servo1.write(state ? 0 : 180);
+
+         // 2. Update Status (Execute logic, then tell DB we did it)
+         Firebase.setBool(fbWrite, "/rooms/" + String(ROOM_ID) + "/status/" + device, state);
+
+         // 3. Clear Command
+         Firebase.deleteNode(fbWrite, "/rooms/" + String(ROOM_ID) + "/manual_command");
+       }
+    }
+  }
+}
+
+// Helper for stream timeouts
+void onStreamTimeout(bool timeout) {
+  if (timeout) Serial.println("Stream Timeout... waiting...");
 }

@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <FirebaseESP32.h>
 #include <esp_now.h>
+#include <esp_task_wdt.h> // <--- 1. NEW: Watchdog Library
 #include <TFT_eSPI.h>
 #include <Wire.h>
 #include <NTPClient.h>
@@ -8,24 +9,24 @@
 #include <vector>
 
 // ================= USER CONFIGURATION =================
-#define WIFI_SSID       "WeiCun"
-#define WIFI_PASSWORD   "GwC270303"
+#define WIFI_SSID       "KoenigseggOne1"
+#define WIFI_PASSWORD   "gwt110199"
 #define FIREBASE_HOST   "localtest-0327-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define FIREBASE_AUTH   "GPK6p0wRo1MRLG0woe3t4sisdGss9jMvaLl2Lq8s"
 #define ROOM_ID         "room_001"  //Change according to desired room
 
 // --- NEW: REMOTE ESP32 CONFIGURATION ---
 // REPLACE THIS with the MAC Address of your SECOND ESP32 (Receiver)
-uint8_t receiverMac[] = {0xFC, 0xB4, 0x67, 0x74, 0x58, 0x0C};
+// uint8_t receiverMac[] = {0xFC, 0xB4, 0x67, 0x74, 0x58, 0x0C};
 
 // Structure to send data
-typedef struct struct_message {
-  char device[10]; // "LOCK" or "LIGHT"
-  bool state;      // true = ON, false = OFF
-} struct_message;
+// typedef struct struct_message {
+//   char device[10]; // "LOCK" or "LIGHT"
+//   bool state;      // true = ON, false = OFF
+// } struct_message;
 
-struct_message myData;
-esp_now_peer_info_t peerInfo;
+// struct_message myData;
+// esp_now_peer_info_t peerInfo;
 
 // Hardware Pins
 #define CTP_SDA          21
@@ -47,6 +48,8 @@ TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite spr = TFT_eSprite(&tft); // <--- SPRITE OBJECT ADDED FOR SCROLLING FIX
 
 FirebaseData firebaseData;
+FirebaseData streamData; // <--- NEW: Dedicated object for streaming
+volatile bool updateNeeded = false; // <--- NEW: Flag to trigger updates
 FirebaseConfig config;
 FirebaseAuth auth;
 WiFiUDP ntpUDP;
@@ -81,19 +84,27 @@ int lastTouchY = 0;             // For drag scrolling
 bool isDragging = false;
 unsigned long lastManualCheckTime = 0; // <--- ADD THIS WITH YOUR GLOBALS
 
-void sendRemoteCommand(String deviceName, bool state) {
-  strcpy(myData.device, deviceName.c_str());
-  myData.state = state;
+// WDT Configuration
+#define WDT_TIMEOUT 10 // <--- 2. NEW: 10 Second Timeout
+
+
+
+
+void streamCallback(StreamData data) {
+  // This function runs automatically whenever data changes in Firebase
+  Serial.println("Stream Data Changed!");
   
-  esp_err_t result = esp_now_send(receiverMac, (uint8_t *) &myData, sizeof(myData));
-  
-  if (result == ESP_OK) {
-    Serial.println("Sent successfully to " + deviceName);
-    updateDeviceStatus(deviceName, state);
-  } else {
-    Serial.println("Error sending the data");
+  // We just set a flag here. We do NOT draw to the screen or use SPI 
+  // inside this callback to prevent crashes/freezing.
+  updateNeeded = true; 
+}
+
+void streamTimeout(bool timeout) {
+  if (timeout) {
+    Serial.println("Stream timeout, resuming...");
   }
 }
+
 
 // ================= SETUP =================
 void setup() {
@@ -102,6 +113,7 @@ void setup() {
   // 1. Hardware Init
  
   Wire.begin(CTP_SDA, CTP_SCL);
+  Wire.setTimeOut(1000);
   pinMode(CTP_RST, OUTPUT);
   digitalWrite(CTP_RST, LOW);
   delay(10);
@@ -117,32 +129,25 @@ void setup() {
   // <--- CREATE SPRITE (Crucial for Scrolling Fix) ---
   spr.createSprite(480, SLOT_HEIGHT); 
 
+  // --- 3. NEW: Enable Watchdog Timer ---
+  Serial.println("Initializing Watchdog...");
+  esp_task_wdt_deinit();
+  esp_task_wdt_config_t wdt_config = {
+    .timeout_ms = WDT_TIMEOUT * 1000, // Convert seconds to ms
+    .idle_core_mask = (1 << 1),       // Monitor Core 1 (where Arduino runs)
+    .trigger_panic = true             // Restart if stuck
+};
+esp_task_wdt_init(&wdt_config);
+esp_task_wdt_add(NULL);
+  // -------------------------------------
+
   // 2. WiFi & Time
   drawLoading("Connecting WiFi...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) delay(500);
-  
-// --- NEW: Init ESP-NOW (Must be done AFTER WiFi is active) ---
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
-    drawLoading("ESP-NOW Failed");
-    delay(2000);
-  }
-
-  // Register Peer (The Remote Receiver)
-  memcpy(peerInfo.peer_addr, receiverMac, 6);
-  peerInfo.channel = 0;  // 0 means use the current WiFi channel (matches Router)
-  peerInfo.encrypt = false;
-  
-  if (esp_now_add_peer(&peerInfo) != ESP_OK){
-    Serial.println("Failed to add peer");
-  }
-  // -------------------------------------------------------------
-  
-  // Init Remote State (Lock and Lights OFF)
-  sendRemoteCommand("LOCK", false);
-  sendRemoteCommand("LIGHT", false);
-
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    esp_task_wdt_reset();
+  };
 
   drawLoading("Syncing Time...");
   timeClient.begin();
@@ -152,7 +157,7 @@ void setup() {
   // }
 
   unsigned long startMillis = millis();
-bool synced = false;
+  bool synced = false;
 
 // Try to sync for a maximum of 10 seconds
 while (millis() - startMillis < 10000) {
@@ -161,6 +166,7 @@ while (millis() - startMillis < 10000) {
         break;
     }
     Serial.print(".");
+    esp_task_wdt_reset(); // Feed dog during time sync
     delay(500); 
 }
 
@@ -175,10 +181,16 @@ if (synced) {
   drawLoading("Connecting Database...");
   config.host = FIREBASE_HOST;
   config.signer.tokens.legacy_token = FIREBASE_AUTH;
-  config.timeout.serverResponse = 10000; 
+  config.timeout.serverResponse = 3000; 
   firebaseData.setBSSLBufferSize(16384, 1024); // allocate a large buffer for large SSL certificates
+  streamData.setBSSLBufferSize(16384, 1024); // <--- NEW: Important for stream stability
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
+
+    // Init Remote State (Lock and Lights OFF)
+  updateDeviceStatus("LOCK", false);
+  updateDeviceStatus("LIGHT", false);
+
 
   // 4. Initialize Data
   initializeTimeSlots();
@@ -187,10 +199,23 @@ if (synced) {
   // 5. Initial Data Fetch
   fetchSchedule();
   drawFullUI();
+
+// --- NEW: START STREAMING ---
+  // Listen specifically to the active_codes node
+  String path = "/rooms/" + String(ROOM_ID) + "/active_codes";
+  
+  if (!Firebase.beginStream(streamData, path)) {
+    Serial.println("Could not begin stream: " + streamData.errorReason());
+  }
+  
+  Firebase.setStreamCallback(streamData, streamCallback, streamTimeout);
+  // ----------------------------
+
 }
 
 // ================= MAIN LOOP =================
 void loop() {
+  esp_task_wdt_reset(); // <--- 4. NEW: Feed the dog! (Must happen < 10s)
   timeClient.update();
   bool isTouched = readTouch();
 
@@ -220,62 +245,36 @@ void loop() {
   
   lastTouchState = isTouched;
 
+   // ============================================================
+  // 3. REAL-TIME SYNC (Triggered by Stream)
   // ============================================================
-  // 2. CHECK MANUAL COMMANDS (Throttled to every 1.5 seconds)
-  // ============================================================
-  if (millis() - lastManualCheckTime > 1500) { 
-    lastManualCheckTime = millis(); // Reset timer
-
-    String cmdPath = "/rooms/" + String(ROOM_ID) + "/manual_command";
-    
-    // Check if a command exists
-    if (Firebase.get(firebaseData, cmdPath)) {
-       // Check if the data is actually a JSON object (valid command)
-       if (firebaseData.dataType() == "json") {
-         FirebaseJson &json = firebaseData.jsonObject();
-         FirebaseJsonData result;
-         
-         // Get the command timestamp
-         long cmdTimestamp = 0;
-         json.get(result, "timestamp"); 
-         if(result.success) cmdTimestamp = result.intValue;
-
-         // Only execute if command is new (within last 10 seconds)
-         // This prevents old commands from re-triggering on restart
-         long now = timeClient.getEpochTime() * 1000LL; 
-         
-         if (abs(now - cmdTimestamp) < 10000) { 
-            String device = "";
-            bool state = false;
-            
-            json.get(result, "device"); if(result.success) device = result.stringValue;
-            json.get(result, "state"); if(result.success) state = result.boolValue;
-            
-            // Execute Command
-            Serial.println("Manual Command Detected: " + device + " -> " + String(state));
-            sendRemoteCommand(device, state);
-            
-            // Delete the node so we don't process it again
-            Firebase.deleteNode(firebaseData, cmdPath); 
-         }
-       }
+  if (updateNeeded) {
+    // <--- ADD THIS CHECK HERE
+    if (WiFi.status() == WL_CONNECTED) { 
+        Serial.println("Change detected! Syncing...");
+        
+        // Slight delay to ensure all data packets arrived
+        delay(500);
+        initializeTimeSlots();
+        fetchSchedule();
+        if (currentScreen == SCREEN_SCHEDULE)
+         drawScheduleContent();
+        drawHeader();
     }
+    // Reset the flag
+    updateNeeded = false;
+    lastSyncTime = millis();
   }
 
-  // ============================================================
-  // 3. PERIODIC FULL SYNC (Every 30s)
-  // ============================================================
+  // OPTIONAL: Keep the 30s timer as a "safety net" in case stream drops
   if (millis() - lastSyncTime > 30000) {
-    initializeTimeSlots();
-    fetchSchedule();
-    if (currentScreen == SCREEN_SCHEDULE) drawScheduleContent();
-    drawHeader();
+    updateNeeded = true; // Force an update
     lastSyncTime = millis();
   }
 
   // 4. Lock Timer
   if (isUnlocked && (millis() - unlockStartTime > 5000)) {
-    sendRemoteCommand("LOCK", false);
+    updateDeviceStatus("LOCK", false);
     isUnlocked = false;
     Serial.println("Door Relocked (Remote)");
   }
@@ -304,6 +303,7 @@ void initializeTimeSlots() {
 
 // <--- NEW: FETCH ROOM NAME ---
 void fetchRoomName() {
+  esp_task_wdt_reset(); // <--- ADD THIS
   String path = "/rooms/" + String(ROOM_ID) + "/config/name";
   if (Firebase.getString(firebaseData, path)) {
     roomNameDisplay = firebaseData.stringData();
@@ -314,6 +314,7 @@ void fetchRoomName() {
 }
 
 void fetchSchedule() {
+  esp_task_wdt_reset(); // <--- FIX 1: Feed before starting
   String path = "/rooms/" + String(ROOM_ID) + "/active_codes";
   
   // 1. Reset all slots
@@ -322,9 +323,11 @@ void fetchSchedule() {
     slot.bookedBy = "";
   }
 // --- NEW: LIGHTS STATE TRACKER ---
-  bool shouldLightsBeOn = false;
+    bool shouldLightsBeOn = false;
+    
   // 2. Fetch Data
   if (Firebase.get(firebaseData, path)) {
+    esp_task_wdt_reset(); // <--- FIX 2: Feed after download completes
     FirebaseJson &json = firebaseData.jsonObject();
     size_t len = json.iteratorBegin();
     String key, value = "";
@@ -351,7 +354,7 @@ void fetchSchedule() {
       subJson.get(result, "start_time"); if(result.success) startTimeUTC = result.intValue;
       subJson.get(result, "end_time"); if(result.success) endTimeUTC = result.intValue;
       subJson.get(result, "created_by"); if(result.success) createdBy = result.stringValue;
-
+      subJson.get(result, "has_checked_in"); if(result.success) hasCheckedIn = result.boolValue;
       long startTimeLocal = startTimeUTC + offsetSeconds;
       long endTimeLocal   = endTimeUTC   + offsetSeconds;
 
@@ -389,7 +392,7 @@ void fetchSchedule() {
   }
 // Only send the command if the state has CHANGED
   if (shouldLightsBeOn != lastSentLightState) {
-    sendRemoteCommand("LIGHT", shouldLightsBeOn);
+    updateDeviceStatus("LIGHT", shouldLightsBeOn);
     lastSentLightState = shouldLightsBeOn; // Update the memory
     
     if(shouldLightsBeOn) {
@@ -419,12 +422,21 @@ void verifyPIN(String pin) {
       long now = timeClient.getEpochTime();
 
       if (now >= startTime && now <= endTime) {
-        sendRemoteCommand("LOCK", true); //Unlock remotely
-        if(useLights) sendRemoteCommand("LIGHT", true); // Turn on lights remotely
+        updateDeviceStatus("LOCK", true); //Unlock remotely
+        if(useLights) updateDeviceStatus("LIGHT", true); // Turn on lights remotely
+
+        // --- ADD THIS LINE ---
+            lastSentLightState = true; // <--- FIX: Update memory so the system knows lights are ON
+            // ---------------------
+
+
         isUnlocked = true;
         unlockStartTime = millis();
         Firebase.setBool(firebaseData, path + "/has_checked_in", true);
         showAccessResult(true);
+        currentScreen = SCREEN_SCHEDULE;
+        scrollOffset = 0;
+
       } else {
         showAccessResult(false);
       }
@@ -438,6 +450,7 @@ void verifyPIN(String pin) {
   
   delay(2000);
   enteredPIN = "";
+  tft.resetViewport();
   drawFullUI();
 }
 
@@ -739,6 +752,7 @@ int getCurrentLocalHour() {
 }
 
 void updateDeviceStatus(String device, bool state) {
+  esp_task_wdt_reset(); // <--- ADD THIS
   String path = "/rooms/" + String(ROOM_ID) + "/status/" + device;
   if (Firebase.setBool(firebaseData, path, state)) {
     Serial.println("Updated Firebase: " + device + " -> " + String(state));
